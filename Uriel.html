@@ -1,0 +1,3070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE WOODS // PS1 HORROR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #050608;
+            color: #d4d4d8;
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+        }
+
+        /* Game Viewport Container */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #020203;
+        }
+
+        /* Low-res PS1 Canvas stretched with crisp pixelation */
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        /* Subtle CRT Scanlines & Vignette Overlay */
+        #crt-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 5;
+            background: 
+                radial-gradient(circle at center, transparent 55%, rgba(0, 0, 0, 0.78) 100%),
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(0, 0, 0, 0.22) 0px,
+                    rgba(0, 0, 0, 0.22) 1px,
+                    transparent 1px,
+                    transparent 3px
+                );
+            transition: opacity 0.2s ease;
+        }
+
+        #crt-overlay.hidden-crt {
+            background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.72) 100%);
+        }
+
+        /* Stalker Gaze VHS / Static Interference Overlay */
+        #stalker-static {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 6;
+            opacity: 0;
+            background:
+                radial-gradient(circle at center, transparent 32%, rgba(20, 0, 0, 0.65) 100%),
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(255, 255, 255, 0.09) 0px,
+                    rgba(255, 255, 255, 0.09) 1px,
+                    rgba(0, 0, 0, 0.25) 2px,
+                    transparent 4px
+                );
+            mix-blend-mode: screen;
+            transition: opacity 0.15s ease;
+        }
+
+        /* Retro PS1 HUD */
+        #hud {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px 32px;
+            text-shadow: 2px 2px 0px #000000;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-size: clamp(1.4rem, 2.5vw, 2.2rem);
+            letter-spacing: 2px;
+        }
+
+        .pages-counter {
+            color: #e4e4e7;
+            background: rgba(10, 12, 14, 0.65);
+            border: 2px solid #3f3f46;
+            padding: 6px 14px;
+        }
+
+        .pages-counter span {
+            color: #ef4444;
+        }
+
+        .controls-hint-mini {
+            font-size: clamp(1rem, 1.5vw, 1.3rem);
+            color: #a1a1aa;
+            text-align: right;
+            background: rgba(10, 12, 14, 0.55);
+            padding: 6px 12px;
+            border: 1px solid #27272a;
+        }
+
+        /* Center Reticle & Pickup Prompt */
+        .hud-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #reticle {
+            width: 6px;
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.45);
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8);
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+
+        #reticle.active {
+            transform: scale(1.8);
+            background-color: #ef4444;
+        }
+
+        #interact-prompt {
+            font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+            color: #fef08a;
+            background: rgba(0, 0, 0, 0.78);
+            border: 2px solid #ca8a04;
+            padding: 4px 14px;
+            letter-spacing: 1px;
+            opacity: 0;
+            transition: opacity 0.12s ease;
+            white-space: nowrap;
+        }
+
+        #interact-prompt.visible {
+            opacity: 1;
+        }
+
+        /* Page Inspection Flash / Toast */
+        #page-toast {
+            position: fixed;
+            top: 22%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: clamp(1.5rem, 2.8vw, 2.4rem);
+            color: #f87171;
+            background: rgba(5, 5, 5, 0.85);
+            border: 2px solid #7f1d1d;
+            padding: 8px 20px;
+            letter-spacing: 3px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 12;
+            transition: opacity 0.3s ease;
+        }
+
+        #page-toast.show {
+            opacity: 1;
+        }
+
+        /* Touch Jumpscare Canvas Overlay */
+        #touch-jumpscare {
+            position: fixed;
+            inset: 0;
+            z-index: 18;
+            background: #040203;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        #touch-jumpscare.active {
+            display: flex;
+            animation: jumpscareShake 0.09s infinite alternate;
+        }
+
+        #jumpscare-canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            filter: contrast(1.32) saturate(1.15);
+        }
+
+        #jumpscare-image {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            filter: contrast(1.32) saturate(1.15);
+            display: none;
+        }
+
+        #jumpscare-image.loaded {
+            display: block;
+        }
+
+        @keyframes jumpscareShake {
+            0% { transform: translate(-6px, -4px) scale(1.03); }
+            50% { transform: translate(6px, 4px) scale(1.06); }
+            100% { transform: translate(-4px, 5px) scale(1.02); }
+        }
+
+        /* Bottom Stamina & Flashlight Status */
+        .hud-bottom {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #stamina-wrapper {
+            width: min(260px, 60vw);
+            height: 12px;
+            background: rgba(0, 0, 0, 0.75);
+            border: 2px solid #52525b;
+            padding: 1px;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        #stamina-wrapper.visible {
+            opacity: 1;
+        }
+
+        #stamina-bar {
+            width: 100%;
+            height: 100%;
+            background: #d4d4d8;
+            transition: width 0.08s linear, background-color 0.2s ease;
+        }
+
+        #stamina-bar.exhausted {
+            background: #dc2626;
+        }
+
+        /* Overlays (Title / Pause / Win) */
+        .overlay-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            background: rgba(4, 5, 7, 0.88);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            backdrop-filter: blur(2px);
+        }
+
+        .overlay-screen.hidden {
+            display: none;
+        }
+
+        .ps1-panel {
+            max-width: 580px;
+            width: 100%;
+            background: #0c0e12;
+            border: 4px solid #3f3f46;
+            box-shadow: 8px 8px 0px #000000;
+            padding: 28px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .game-title {
+            font-size: clamp(2.6rem, 6vw, 4.2rem);
+            color: #e4e4e7;
+            letter-spacing: 5px;
+            line-height: 1;
+            text-shadow: 3px 3px 0px #7f1d1d;
+        }
+
+        .game-subtitle {
+            font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+            color: #a1a1aa;
+            letter-spacing: 2px;
+        }
+
+        .controls-box {
+            background: #060709;
+            border: 2px solid #27272a;
+            padding: 16px;
+            text-align: left;
+            font-size: clamp(1.15rem, 2vw, 1.45rem);
+            line-height: 1.5;
+            color: #d4d4d8;
+        }
+
+        .controls-box strong {
+            color: #fef08a;
+            font-weight: normal;
+        }
+
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 6px;
+        }
+
+        .ps1-btn {
+            font-family: 'VT323', monospace;
+            font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+            letter-spacing: 2px;
+            padding: 10px 26px;
+            background: #18181b;
+            color: #f4f4f5;
+            border: 3px solid #71717a;
+            box-shadow: 4px 4px 0px #000000;
+            cursor: pointer;
+            transition: transform 0.08s ease, background-color 0.1s ease, border-color 0.1s ease;
+        }
+
+        .ps1-btn:hover {
+            background: #27272a;
+            border-color: #ef4444;
+            color: #ffffff;
+        }
+
+        .ps1-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000000;
+        }
+
+        .ps1-btn.primary {
+            background: #7f1d1d;
+            border-color: #ef4444;
+        }
+
+        .ps1-btn.primary:hover {
+            background: #991b1b;
+        }
+
+        /* Mobile Fallback Touch Controls (shown only on touch devices if needed) */
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 15;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        @media (pointer: coarse) {
+            #mobile-controls {
+                display: flex;
+            }
+        }
+
+        .touch-pad {
+            pointer-events: auto;
+            display: grid;
+            grid-template-columns: repeat(3, 52px);
+            grid-template-rows: repeat(3, 52px);
+            gap: 4px;
+        }
+
+        .touch-btn {
+            background: rgba(24, 24, 27, 0.75);
+            border: 2px solid #52525b;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .touch-btn:active {
+            background: rgba(239, 68, 68, 0.6);
+        }
+
+        .touch-actions {
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .touch-action-btn {
+            padding: 12px 18px;
+            background: rgba(24, 24, 27, 0.8);
+            border: 2px solid #71717a;
+            color: #fef08a;
+            font-family: 'VT323', monospace;
+            font-size: 1.3rem;
+        }
+    </style>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="game-container"></div>
+    <div id="crt-overlay"></div>
+    <div id="stalker-static"></div>
+    <div id="touch-jumpscare">
+        <canvas id="jumpscare-canvas" width="256" height="208"></canvas>
+        <img id="jumpscare-image" src="https://florafox.github.io/floras-game-server/jumpscare.png" alt="Jumpscare">
+    </div>
+
+    <!-- In-Game HUD -->
+    <div id="hud">
+        <div class="hud-top">
+            <div class="pages-counter">PAGES: <span id="page-count">0</span> / 8</div>
+            <div class="controls-hint-mini">
+                [WASD] MOVE &bull; [SHIFT] RUN &bull; [F] LIGHT &bull; [C] CRT
+            </div>
+        </div>
+
+        <div class="hud-center">
+            <div id="reticle"></div>
+            <div id="interact-prompt">CLICK OR [E] TO TAKE PAGE</div>
+        </div>
+
+        <div id="page-toast">PAGE COLLECTED</div>
+
+        <div class="hud-bottom">
+            <div id="stamina-wrapper">
+                <div id="stamina-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile / Touch Fallback Controls -->
+    <div id="mobile-controls">
+        <div class="touch-pad">
+            <div></div>
+            <button class="touch-btn" data-key="KeyW">W</button>
+            <div></div>
+            <button class="touch-btn" data-key="KeyA">A</button>
+            <button class="touch-btn" data-key="KeyS">S</button>
+            <button class="touch-btn" data-key="KeyD">D</button>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="touch-actions">
+            <button class="touch-action-btn" id="touch-take">TAKE [E]</button>
+            <button class="touch-action-btn" id="touch-light">LIGHT [F]</button>
+        </div>
+    </div>
+
+    <!-- Start / Pause Overlay -->
+    <div id="start-overlay" class="overlay-screen">
+        <div class="ps1-panel">
+            <div class="game-title">DEAD PINES</div>
+            <div class="game-subtitle">FIND ALL 8 PAGES IN THE DARK</div>
+            <div class="controls-box">
+                <div>&bull; <strong>WASD / ARROWS</strong> : Walk through the forest</div>
+                <div>&bull; <strong>MOUSE CURSOR</strong> : Look around (360&deg;)</div>
+                <div>&bull; <strong>SHIFT</strong> : Sprint (watch your breath)</div>
+                <div>&bull; <strong>LEFT CLICK / E</strong> : Collect hung page</div>
+                <div>&bull; <strong>F</strong> : Toggle flashlight &nbsp;|&nbsp; <strong>C</strong> : Toggle CRT scanlines</div>
+            </div>
+            <div class="btn-row">
+                <button id="play-btn" class="ps1-btn primary">CLICK TO PLAY</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Win Screen Overlay -->
+    <div id="win-overlay" class="overlay-screen hidden">
+        <div class="ps1-panel">
+            <div class="game-title" style="color: #fef08a;">8 / 8 FOUND</div>
+            <div class="game-subtitle">YOU ESCAPED THE WOODS... FOR NOW.</div>
+            <div class="controls-box" style="text-align: center;">
+                All eight tattered notes have been recovered from the trees.<br>
+                The static in the air fades away.
+            </div>
+            <div class="btn-row">
+                <button id="restart-btn" class="ps1-btn primary">PLAY AGAIN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * DEAD PINES - PS1 Retro 3D Horror Forest Game
+         * Single-file Three.js + Web Audio API implementation
+         */
+
+        // ==========================================
+        // 1. CONFIGURATION & CONSTANTS
+        // ==========================================
+        const PS1_WIDTH = 360;  // Authentic low internal horizontal resolution
+        const PS1_HEIGHT = 270; // 4:3 aspect ratio
+        const WORLD_RADIUS = 135;
+        const TOTAL_PAGES = 8;
+        const PLAYER_HEIGHT = 1.75;
+        const PLAYER_RADIUS = 0.45;
+        const WALK_SPEED = 4.6;
+        const SPRINT_SPEED = 7.8;
+
+        const PAGE_MESSAGES = [
+            "ALWAYS WATCHING",
+            "NO EYES",
+            "DON'T LOOK BACK",
+            "LEAVE THE WOODS",
+            "IT FOLLOWS",
+            "NO ESCAPE",
+            "HELP ME",
+            "BEHIND THE TREES"
+        ];
+
+        // ==========================================
+        // 2. PROCEDURAL WEB AUDIO ENGINE
+        // ==========================================
+        class HorrorAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.masterGain = null;
+                this.droneGain = null;
+                this.droneOsc1 = null;
+                this.droneOsc2 = null;
+                this.windGain = null;
+                this.initialized = false;
+                this.stepTimer = 0;
+            }
+
+            init() {
+                if (this.initialized) {
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                    return;
+                }
+
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+
+                    this.masterGain = this.ctx.createGain();
+                    this.masterGain.gain.value = 0.65;
+                    this.masterGain.connect(this.ctx.destination);
+
+                    this.setupWindAmbience();
+                    this.setupTensionDrone();
+                    this.initialized = true;
+                } catch (e) {
+                    console.warn("Web Audio API not supported:", e);
+                }
+            }
+
+            setupWindAmbience() {
+                // Create filtered brown/pink-ish noise buffer for eerie forest wind
+                const bufferSize = this.ctx.sampleRate * 4;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                let lastOut = 0.0;
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    data[i] = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = data[i];
+                    data[i] *= 2.8;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                noise.loop = true;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 280;
+                filter.Q.value = 1.8;
+
+                // Slowly modulate wind pitch
+                const lfo = this.ctx.createOscillator();
+                lfo.frequency.value = 0.12;
+                const lfoGain = this.ctx.createGain();
+                lfoGain.gain.value = 110;
+                lfo.connect(lfoGain);
+                lfoGain.connect(filter.frequency);
+                lfo.start();
+
+                this.windGain = this.ctx.createGain();
+                this.windGain.gain.value = 0.22;
+
+                noise.connect(filter);
+                filter.connect(this.windGain);
+                this.windGain.connect(this.masterGain);
+                noise.start();
+            }
+
+            setupTensionDrone() {
+                // Low dissonant oscillators that intensify as pages are collected
+                this.droneGain = this.ctx.createGain();
+                this.droneGain.gain.value = 0.02;
+                this.droneGain.connect(this.masterGain);
+
+                this.droneOsc1 = this.ctx.createOscillator();
+                this.droneOsc1.type = 'sawtooth';
+                this.droneOsc1.frequency.value = 46.25; // F#1
+
+                this.droneOsc2 = this.ctx.createOscillator();
+                this.droneOsc2.type = 'triangle';
+                this.droneOsc2.frequency.value = 49.00; // G1 (minor second tension)
+
+                const droneFilter = this.ctx.createBiquadFilter();
+                droneFilter.type = 'lowpass';
+                droneFilter.frequency.value = 130;
+
+                this.droneOsc1.connect(droneFilter);
+                this.droneOsc2.connect(droneFilter);
+                droneFilter.connect(this.droneGain);
+
+                this.droneOsc1.start();
+                this.droneOsc2.start();
+
+                // Eerie metallic choir / static hum for when the Watcher stares at you
+                this.stalkerGain = this.ctx.createGain();
+                this.stalkerGain.gain.value = 0.0;
+                this.stalkerGain.connect(this.masterGain);
+
+                this.stalkerOsc1 = this.ctx.createOscillator();
+                this.stalkerOsc1.type = 'sine';
+                this.stalkerOsc1.frequency.value = 110.0;
+
+                this.stalkerOsc2 = this.ctx.createOscillator();
+                this.stalkerOsc2.type = 'sawtooth';
+                this.stalkerOsc2.frequency.value = 116.54; // Tritone / minor second dissonance
+
+                const stalkerFilter = this.ctx.createBiquadFilter();
+                stalkerFilter.type = 'bandpass';
+                stalkerFilter.frequency.value = 340;
+                stalkerFilter.Q.value = 4.5;
+
+                this.stalkerOsc1.connect(stalkerFilter);
+                this.stalkerOsc2.connect(stalkerFilter);
+                stalkerFilter.connect(this.stalkerGain);
+
+                this.stalkerOsc1.start();
+                this.stalkerOsc2.start();
+
+                this.heartbeatTimer = 0;
+            }
+
+            updateStalkerPresence(dt, stareIntensity) {
+                if (!this.initialized || !this.stalkerGain) return;
+                const targetGain = stareIntensity * 0.22;
+                this.stalkerGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.18);
+
+                if (stareIntensity > 0.15) {
+                    this.heartbeatTimer += dt * (1.4 + stareIntensity * 1.6);
+                    if (this.heartbeatTimer >= 1.0) {
+                        this.heartbeatTimer = 0;
+                        this.playHeartbeat(stareIntensity);
+                    }
+                } else {
+                    this.heartbeatTimer = 0.75;
+                }
+            }
+
+            playHeartbeat(intensity) {
+                if (!this.initialized) return;
+                const now = this.ctx.currentTime;
+                [0, 0.16].forEach((offset, beatIdx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(beatIdx === 0 ? 58 : 48, now + offset);
+                    osc.frequency.exponentialRampToValueAtTime(24, now + offset + 0.14);
+
+                    const peak = (beatIdx === 0 ? 0.28 : 0.2) * intensity;
+                    gain.gain.setValueAtTime(0.001, now + offset);
+                    gain.gain.linearRampToValueAtTime(peak, now + offset + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
+
+                    osc.connect(gain);
+                    gain.connect(this.masterGain);
+                    osc.start(now + offset);
+                    osc.stop(now + offset + 0.16);
+                });
+            }
+
+            playStalkerSpotStinger() {
+                if (!this.initialized) return;
+                const now = this.ctx.currentTime;
+
+                // Subtle eerie metallic scrape / distant whisper chime when spotted
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(293.66, now); // D4
+                osc.frequency.exponentialRampToValueAtTime(138.59, now + 1.1); // C#3 drop
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 520;
+                filter.Q.value = 6.0;
+
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(0.24, now + 0.06);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(now);
+                osc.stop(now + 1.25);
+            }
+
+            /**
+             * Synthesizes a nightmarish, agonizing shriek actively choking and drowning on blood:
+             * - Strained, distorted vocal cord shriek with irregular airway-blockage stutter cutoffs
+             * - Thick wet blood bubbling & resonant fluid gurgles in the throat/lungs
+             * - Violent asphyxiation gasps & ragged inward wheezes as the voice cuts out
+             * @param {boolean} isCloseScare - true for piercing close jumpscare, false for distant forest echo
+             */
+            playHorrorScream(isCloseScare = false) {
+                if (!this.initialized) return;
+                const now = this.ctx.currentTime;
+                const duration = isCloseScare ? 2.65 : 2.95;
+                const peakGain = isCloseScare ? 0.68 : 0.30;
+
+                // Harsh PS1 clipping / waveshaper distortion for visceral vocal tear
+                const shaper = this.ctx.createWaveShaper();
+                const curve = new Float32Array(256);
+                const drive = isCloseScare ? 34 : 15;
+                for (let i = 0; i < 256; i++) {
+                    const x = (i * 2) / 256 - 1;
+                    curve[i] = ((3 + drive) * x * 20 * (Math.PI / 180)) / (Math.PI + drive * Math.abs(x));
+                }
+                shaper.curve = curve;
+
+                // Distance lowpass muffling when echoing from deep in the fog
+                const distFilter = this.ctx.createBiquadFilter();
+                distFilter.type = 'lowpass';
+                distFilter.frequency.value = isCloseScare ? 5400 : 1450;
+
+                const masterScreamGain = this.ctx.createGain();
+                masterScreamGain.gain.setValueAtTime(peakGain, now);
+                masterScreamGain.connect(this.masterGain);
+                distFilter.connect(masterScreamGain);
+
+                // ---------------------------------------------------------
+                // LAYER 1: Strained Vocal Cord Shriek with Choking Spasms
+                // ---------------------------------------------------------
+                const formant1 = this.ctx.createBiquadFilter();
+                formant1.type = 'bandpass';
+                formant1.frequency.setValueAtTime(isCloseScare ? 840 : 710, now);
+                formant1.frequency.exponentialRampToValueAtTime(420, now + duration * 0.78);
+                formant1.Q.value = 3.6;
+
+                const formant2 = this.ctx.createBiquadFilter();
+                formant2.type = 'bandpass';
+                formant2.frequency.setValueAtTime(isCloseScare ? 1920 : 1480, now);
+                formant2.frequency.exponentialRampToValueAtTime(890, now + duration * 0.78);
+                formant2.Q.value = 4.5;
+
+                // Irregular choking envelope: pierces out, violently cuts off as blood blocks airway,
+                // spasms back into a strained shriek, then strangles down into wet wheezing
+                const vocalChokeGain = this.ctx.createGain();
+                vocalChokeGain.gain.setValueAtTime(0.001, now);
+                vocalChokeGain.gain.linearRampToValueAtTime(0.95, now + (isCloseScare ? 0.04 : 0.18));
+                vocalChokeGain.gain.setValueAtTime(0.88, now + 0.34);
+                // First sudden blood blockage cutoff
+                vocalChokeGain.gain.exponentialRampToValueAtTime(0.04, now + 0.43);
+                vocalChokeGain.gain.setValueAtTime(0.04, now + 0.54);
+                // Desperate strained shriek surge
+                vocalChokeGain.gain.linearRampToValueAtTime(0.92, now + 0.62);
+                vocalChokeGain.gain.setValueAtTime(0.76, now + 0.96);
+                // Second violent choking spasm
+                vocalChokeGain.gain.exponentialRampToValueAtTime(0.03, now + 1.06);
+                vocalChokeGain.gain.setValueAtTime(0.03, now + 1.18);
+                // Weak, drowning vocal tear
+                vocalChokeGain.gain.linearRampToValueAtTime(0.58, now + 1.28);
+                vocalChokeGain.gain.exponentialRampToValueAtTime(0.08, now + 1.65);
+                vocalChokeGain.gain.linearRampToValueAtTime(0.24, now + 1.76);
+                vocalChokeGain.gain.exponentialRampToValueAtTime(0.001, now + 2.15);
+
+                const freqs = isCloseScare ? [595, 634, 1190] : [485, 517];
+                freqs.forEach((baseF, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = idx % 2 === 0 ? 'sawtooth' : 'square';
+                    osc.frequency.setValueAtTime(baseF * 0.85, now);
+                    osc.frequency.linearRampToValueAtTime(baseF * 1.18, now + 0.12);
+                    // Pitch drops raggedly as lungs fill with fluid
+                    osc.frequency.exponentialRampToValueAtTime(baseF * 0.46, now + 2.15);
+
+                    // Harsh vocal cord tear & fluid-rattle FM
+                    const vib = this.ctx.createOscillator();
+                    vib.frequency.value = 31 + idx * 11;
+                    const vibGain = this.ctx.createGain();
+                    vibGain.gain.value = isCloseScare ? 54 : 28;
+                    vib.connect(vibGain);
+                    vibGain.connect(osc.frequency);
+
+                    osc.connect(formant1);
+                    osc.connect(formant2);
+                    vib.start(now);
+                    osc.start(now);
+                    vib.stop(now + 2.2);
+                    osc.stop(now + 2.2);
+                });
+
+                formant1.connect(shaper);
+                formant2.connect(shaper);
+                shaper.connect(vocalChokeGain);
+                vocalChokeGain.connect(distFilter);
+
+                // ---------------------------------------------------------
+                // LAYER 2: Wet Blood Gurgle & Fluid Bubbling in Lungs
+                // ---------------------------------------------------------
+                const gurgleDur = duration;
+                const gurgleBufSize = Math.floor(this.ctx.sampleRate * gurgleDur);
+                const gurgleBuf = this.ctx.createBuffer(1, gurgleBufSize, this.ctx.sampleRate);
+                const gData = gurgleBuf.getChannelData(0);
+
+                // Generate irregular viscous liquid bubble pops & thick throat rattle
+                let bubbleEnv = 0;
+                for (let i = 0; i < gurgleBufSize; i++) {
+                    if (Math.random() < 0.0045) {
+                        bubbleEnv = 0.6 + Math.random() * 0.4;
+                    }
+                    bubbleEnv *= 0.992;
+                    const rattle = Math.sin(i * 0.024) * Math.sin(i * 0.0071);
+                    const white = Math.random() * 2 - 1;
+                    gData[i] = white * (0.15 + bubbleEnv * 0.85) * (0.4 + 0.6 * Math.abs(rattle));
+                }
+
+                const gurgleSrc = this.ctx.createBufferSource();
+                gurgleSrc.buffer = gurgleBuf;
+
+                // Dual resonant liquid cavity filters (240Hz chest & 560Hz throat)
+                const chestBubble = this.ctx.createBiquadFilter();
+                chestBubble.type = 'bandpass';
+                chestBubble.frequency.value = 260;
+                chestBubble.Q.value = 6.5;
+
+                const throatBubble = this.ctx.createBiquadFilter();
+                throatBubble.type = 'bandpass';
+                throatBubble.frequency.value = 540;
+                throatBubble.Q.value = 5.5;
+
+                // Modulate bubble resonance pitch rapidly to sound like churning fluid
+                const bubbleLfo = this.ctx.createOscillator();
+                bubbleLfo.frequency.value = 19;
+                const bubbleLfoGain = this.ctx.createGain();
+                bubbleLfoGain.gain.value = 140;
+                bubbleLfo.connect(bubbleLfoGain);
+                bubbleLfoGain.connect(throatBubble.frequency);
+                bubbleLfoGain.connect(chestBubble.frequency);
+
+                const gurgleGain = this.ctx.createGain();
+                gurgleGain.gain.setValueAtTime(0.001, now);
+                gurgleGain.gain.linearRampToValueAtTime(0.85, now + 0.25);
+                // Fluid gurgling surges loudest during airway blockages and after vocal cords fail
+                gurgleGain.gain.setValueAtTime(0.95, now + 1.15);
+                gurgleGain.gain.linearRampToValueAtTime(0.75, now + 2.15);
+                gurgleGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                gurgleSrc.connect(chestBubble);
+                gurgleSrc.connect(throatBubble);
+                chestBubble.connect(gurgleGain);
+                throatBubble.connect(gurgleGain);
+                gurgleGain.connect(distFilter);
+
+                gurgleSrc.start(now);
+                bubbleLfo.start(now);
+                bubbleLfo.stop(now + duration);
+
+                // ---------------------------------------------------------
+                // LAYER 3: Asphyxiation Gasps & Ragged Inward Wheezes
+                // ---------------------------------------------------------
+                const wheezeBufSize = Math.floor(this.ctx.sampleRate * duration);
+                const wheezeBuf = this.ctx.createBuffer(1, wheezeBufSize, this.ctx.sampleRate);
+                const wData = wheezeBuf.getChannelData(0);
+                for (let i = 0; i < wheezeBufSize; i++) {
+                    wData[i] = Math.random() * 2 - 1;
+                }
+
+                const wheezeSrc = this.ctx.createBufferSource();
+                wheezeSrc.buffer = wheezeBuf;
+
+                const wheezeFilter = this.ctx.createBiquadFilter();
+                wheezeFilter.type = 'bandpass';
+                wheezeFilter.frequency.setValueAtTime(1350, now);
+                wheezeFilter.frequency.linearRampToValueAtTime(1750, now + 0.5);
+                wheezeFilter.frequency.exponentialRampToValueAtTime(920, now + duration);
+                wheezeFilter.Q.value = 7.5;
+
+                // Narrow whistling airway constriction filter
+                const airwayFilter = this.ctx.createBiquadFilter();
+                airwayFilter.type = 'bandpass';
+                airwayFilter.frequency.setValueAtTime(1350, now);
+                airwayFilter.frequency.linearRampToValueAtTime(1750, now + 0.5);
+                airwayFilter.frequency.exponentialRampToValueAtTime(920, now + duration);
+                airwayFilter.Q.value = 7.5;
+
+                const wheezeGain = this.ctx.createGain();
+                wheezeGain.gain.setValueAtTime(0.001, now);
+                // Desperate inward gasp during first choke gap (0.43s - 0.58s)
+                wheezeGain.gain.setValueAtTime(0.001, now + 0.41);
+                wheezeGain.gain.linearRampToValueAtTime(0.55, now + 0.48);
+                wheezeGain.gain.exponentialRampToValueAtTime(0.02, now + 0.60);
+                // Second desperate gasp during second choke gap (1.06s - 1.24s)
+                wheezeGain.gain.setValueAtTime(0.02, now + 1.04);
+                wheezeGain.gain.linearRampToValueAtTime(0.62, now + 1.12);
+                wheezeGain.gain.exponentialRampToValueAtTime(0.03, now + 1.26);
+                // Final drowning suffocation wheeze after vocal cords collapse (2.05s - 2.60s)
+                wheezeGain.gain.setValueAtTime(0.03, now + 2.02);
+                wheezeGain.gain.linearRampToValueAtTime(0.48, now + 2.22);
+                wheezeGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                wheezeSrc.connect(wheezeFilter);
+                wheezeFilter.connect(wheezeGain);
+                wheezeSrc.connect(airwayFilter);
+                airwayFilter.connect(wheezeGain);
+                wheezeGain.connect(distFilter);
+                wheezeSrc.start(now);
+            }
+
+            /**
+             * Synthesizes an occasional eerie background crying / sobbing sound
+             * with trembling breathy wails and soft wet sobs in the woods.
+             */
+            playBackgroundCry() {
+                if (!this.initialized) return;
+                const now = this.ctx.currentTime;
+                const totalDur = 3.2;
+
+                // Trembling low-to-mid sobbing wail
+                const wailOsc = this.ctx.createOscillator();
+                wailOsc.type = 'triangle';
+                wailOsc.frequency.setValueAtTime(340, now);
+                wailOsc.frequency.linearRampToValueAtTime(435, now + 0.65);
+                wailOsc.frequency.exponentialRampToValueAtTime(255, now + 1.45);
+                wailOsc.frequency.linearRampToValueAtTime(385, now + 2.15);
+                wailOsc.frequency.exponentialRampToValueAtTime(215, now + totalDur);
+
+                // Quivering sob vibrato
+                const quiver = this.ctx.createOscillator();
+                quiver.frequency.value = 11.5;
+                const quiverGain = this.ctx.createGain();
+                quiverGain.gain.value = 16;
+                quiver.connect(quiverGain);
+                quiverGain.connect(wailOsc.frequency);
+
+                const wailFilter = this.ctx.createBiquadFilter();
+                wailFilter.type = 'bandpass';
+                wailFilter.frequency.value = 540;
+                wailFilter.Q.value = 3.8;
+
+                // Breathy sobbing noise layer
+                const bufSize = Math.floor(this.ctx.sampleRate * totalDur);
+                const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < bufSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const breathSrc = this.ctx.createBufferSource();
+                breathSrc.buffer = buf;
+
+                const breathFilter = this.ctx.createBiquadFilter();
+                breathFilter.type = 'bandpass';
+                breathFilter.frequency.value = 980;
+                breathFilter.Q.value = 2.6;
+
+                // Rhythmic sob pulses ("hah... hah... wail...")
+                const sobEnv = this.ctx.createGain();
+                sobEnv.gain.setValueAtTime(0.001, now);
+                const sobPulses = [
+                    [0.05, 0.25, 0.55, 0.16],
+                    [0.65, 0.95, 1.45, 0.24],
+                    [1.60, 1.80, 2.02, 0.15],
+                    [2.10, 2.45, 3.15, 0.21]
+                ];
+                sobPulses.forEach(([start, peak, end, amp]) => {
+                    sobEnv.gain.setValueAtTime(0.002, now + start);
+                    sobEnv.gain.linearRampToValueAtTime(amp, now + peak);
+                    sobEnv.gain.exponentialRampToValueAtTime(0.002, now + end);
+                });
+
+                const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+                if (panner) {
+                    panner.pan.setValueAtTime((Math.random() - 0.5) * 1.2, now);
+                }
+
+                wailOsc.connect(wailFilter);
+                breathSrc.connect(breathFilter);
+                wailFilter.connect(sobEnv);
+                breathFilter.connect(sobEnv);
+
+                if (panner) {
+                    sobEnv.connect(panner);
+                    panner.connect(this.masterGain);
+                } else {
+                    sobEnv.connect(this.masterGain);
+                }
+
+                quiver.start(now);
+                wailOsc.start(now);
+                breathSrc.start(now);
+                quiver.stop(now + totalDur);
+                wailOsc.stop(now + totalDur);
+            }
+
+            updateTension(pagesCollected) {
+                if (!this.initialized || !this.droneGain) return;
+                const ratio = pagesCollected / TOTAL_PAGES;
+                const targetGain = 0.02 + ratio * 0.16;
+                this.droneGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.5);
+                this.droneOsc2.frequency.setTargetAtTime(49.0 + ratio * 6.5, this.ctx.currentTime, 0.5);
+            }
+
+            playFootstep(isSprinting) {
+                if (!this.initialized) return;
+                const now = this.ctx.currentTime;
+
+                // Short burst of filtered noise for crunching dirt/leaves
+                const duration = 0.09;
+                const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    const env = 1 - (i / bufferSize);
+                    data[i] = (Math.random() * 2 - 1) * env * env;
+                }
+
+                const src = this.ctx.createBufferSource();
+                src.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = isSprinting ? 750 + Math.random() * 250 : 520 + Math.random() * 180;
+
+                const gain = this.ctx.createGain();
+                gain.gain.value = isSprinting ? 0.24 : 0.14;
+
+                src.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.masterGain);
+                src.start(now);
+            }
+
+            playFlashlightClick() {
+                if (!this.initialized) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(1400, now);
+                osc.frequency.exponentialRampToValueAtTime(320, now + 0.035);
+
+                gain.gain.setValueAtTime(0.18, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(now);
+                osc.stop(now + 0.04);
+            }
+
+            playPagePickup(count) {
+                if (!this.initialized) return;
+                const now = this.ctx.currentTime;
+
+                // 1. Paper rustle noise burst
+                const rustleDur = 0.28;
+                const bufSize = Math.floor(this.ctx.sampleRate * rustleDur);
+                const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < bufSize; i++) {
+                    const t = i / bufSize;
+                    const env = Math.sin(t * Math.PI);
+                    data[i] = (Math.random() * 2 - 1) * env;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buf;
+
+                const hp = this.ctx.createBiquadFilter();
+                hp.type = 'highpass';
+                hp.frequency.value = 1100;
+
+                const noiseGain = this.ctx.createGain();
+                noiseGain.gain.value = 0.35;
+
+                noise.connect(hp);
+                hp.connect(noiseGain);
+                noiseGain.connect(this.masterGain);
+                noise.start(now);
+
+                // 2. Classic horror bass boom / stinger hit
+                const boom = this.ctx.createOscillator();
+                const boomGain = this.ctx.createGain();
+                boom.type = 'sawtooth';
+                const startFreq = 95 + count * 8;
+                boom.frequency.setValueAtTime(startFreq, now);
+                boom.frequency.exponentialRampToValueAtTime(28, now + 0.9);
+
+                const lp = this.ctx.createBiquadFilter();
+                lp.type = 'lowpass';
+                lp.frequency.setValueAtTime(420, now);
+                lp.frequency.exponentialRampToValueAtTime(60, now + 0.9);
+
+                boomGain.gain.setValueAtTime(0.45, now);
+                boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+
+                boom.connect(lp);
+                lp.connect(boomGain);
+                boomGain.connect(this.masterGain);
+                boom.start(now);
+                boom.stop(now + 1.0);
+            }
+        }
+
+        // ==========================================
+        // 3. PS1 PROCEDURAL TEXTURE & SHADER HELPERS
+        // ==========================================
+        function makeNearestTexture(canvas) {
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            tex.generateMipmaps = false;
+            return tex;
+        }
+
+        function createBarkTexture() {
+            const c = document.createElement('canvas');
+            c.width = 64;
+            c.height = 64;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = '#241b15';
+            ctx.fillRect(0, 0, 64, 64);
+
+            // Vertical bark ridges with chunky pixels
+            for (let x = 0; x < 64; x += 2) {
+                const shade = Math.floor(Math.random() * 24);
+                ctx.fillStyle = `rgb(${26 + shade}, ${19 + Math.floor(shade * 0.7)}, ${14 + Math.floor(shade * 0.5)})`;
+                ctx.fillRect(x, 0, 2, 64);
+            }
+
+            // Cracks & knots
+            for (let i = 0; i < 90; i++) {
+                const x = Math.floor(Math.random() * 32) * 2;
+                const y = Math.floor(Math.random() * 64);
+                const h = 4 + Math.floor(Math.random() * 14);
+                ctx.fillStyle = Math.random() > 0.3 ? '#120d0a' : '#382a20';
+                ctx.fillRect(x, y, 2, h);
+            }
+
+            const tex = makeNearestTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(2, 4);
+            return tex;
+        }
+
+        function createFoliageTexture() {
+            const c = document.createElement('canvas');
+            c.width = 32;
+            c.height = 32;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = '#0d1a11';
+            ctx.fillRect(0, 0, 32, 32);
+
+            for (let y = 0; y < 32; y += 2) {
+                for (let x = 0; x < 32; x += 2) {
+                    const r = Math.random();
+                    if (r > 0.65) ctx.fillStyle = '#142619';
+                    else if (r > 0.3) ctx.fillStyle = '#0a140d';
+                    else ctx.fillStyle = '#1b2e1e';
+                    ctx.fillRect(x, y, 2, 2);
+                }
+            }
+
+            const tex = makeNearestTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        function createGroundTexture() {
+            const c = document.createElement('canvas');
+            c.width = 64;
+            c.height = 64;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = '#141712';
+            ctx.fillRect(0, 0, 64, 64);
+
+            // Pixelated dirt, moss, dead pine needles
+            const palette = ['#181c14', '#10130e', '#1f1b16', '#24291d', '#0d0f0b'];
+            for (let y = 0; y < 64; y += 2) {
+                for (let x = 0; x < 64; x += 2) {
+                    ctx.fillStyle = palette[Math.floor(Math.random() * palette.length)];
+                    ctx.fillRect(x, y, 2, 2);
+                }
+            }
+
+            const tex = makeNearestTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(70, 70);
+            return tex;
+        }
+
+        function createStoneTexture() {
+            const c = document.createElement('canvas');
+            c.width = 64;
+            c.height = 64;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#2c2e33';
+            ctx.fillRect(0, 0, 64, 64);
+
+            // Brick/cobble blocks
+            for (let row = 0; row < 8; row++) {
+                const offset = (row % 2) * 8;
+                for (let col = -1; col < 5; col++) {
+                    const shade = 38 + Math.floor(Math.random() * 26);
+                    ctx.fillStyle = `rgb(${shade}, ${shade + 2}, ${shade + 5})`;
+                    ctx.fillRect(col * 16 + offset + 1, row * 8 + 1, 14, 6);
+                }
+            }
+            const tex = makeNearestTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        function createRustMetalTexture() {
+            const c = document.createElement('canvas');
+            c.width = 32;
+            c.height = 32;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#3b2316';
+            ctx.fillRect(0, 0, 32, 32);
+
+            for (let i = 0; i < 140; i++) {
+                const x = Math.floor(Math.random() * 16) * 2;
+                const y = Math.floor(Math.random() * 16) * 2;
+                ctx.fillStyle = Math.random() > 0.5 ? '#592e18' : '#241712';
+                ctx.fillRect(x, y, 2, 2);
+            }
+            return makeNearestTexture(c);
+        }
+
+        function createCreepyPageTexture(index) {
+            const c = document.createElement('canvas');
+            c.width = 64;
+            c.height = 84;
+            const ctx = c.getContext('2d');
+
+            // Tattered off-white paper base
+            ctx.fillStyle = '#d6d0c4';
+            ctx.fillRect(2, 2, 60, 80);
+
+            // Dirt smudges & yellowed edges
+            for (let i = 0; i < 120; i++) {
+                const x = Math.floor(Math.random() * 64);
+                const y = Math.floor(Math.random() * 84);
+                ctx.fillStyle = Math.random() > 0.4 ? 'rgba(90, 78, 60, 0.25)' : 'rgba(30, 25, 20, 0.2)';
+                ctx.fillRect(x, y, 2, 2);
+            }
+
+            // Jagged torn edges
+            ctx.clearRect(0, 0, 64, 2);
+            ctx.clearRect(0, 82, 64, 2);
+            for (let i = 0; i < 14; i++) {
+                ctx.clearRect(Math.floor(Math.random() * 64), 0, 2, 3);
+                ctx.clearRect(Math.floor(Math.random() * 64), 81, 2, 3);
+            }
+
+            // Creepy ink scrawls depending on page index
+            ctx.strokeStyle = '#111111';
+            ctx.fillStyle = '#111111';
+            ctx.lineWidth = 2;
+
+            const variant = index % 8;
+            if (variant === 0) {
+                // Tall figure + circles
+                ctx.beginPath();
+                ctx.arc(32, 22, 6, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(32, 28);
+                ctx.lineTo(32, 64);
+                ctx.moveTo(32, 35);
+                ctx.lineTo(16, 56);
+                ctx.moveTo(32, 35);
+                ctx.lineTo(48, 56);
+                ctx.stroke();
+            } else if (variant === 1) {
+                // Crossed out eyes
+                ctx.beginPath();
+                ctx.arc(20, 28, 7, 0, Math.PI * 2);
+                ctx.arc(44, 28, 7, 0, Math.PI * 2);
+                ctx.moveTo(12, 20); ctx.lineTo(28, 36);
+                ctx.moveTo(28, 20); ctx.lineTo(12, 36);
+                ctx.moveTo(36, 20); ctx.lineTo(52, 36);
+                ctx.moveTo(52, 20); ctx.lineTo(36, 36);
+                ctx.stroke();
+                ctx.fillRect(14, 54, 36, 3);
+                ctx.fillRect(18, 62, 28, 3);
+            } else if (variant === 2) {
+                // Spiral / vortex
+                ctx.beginPath();
+                for (let a = 0; a < 18; a += 0.35) {
+                    const r = a * 1.1;
+                    const px = 32 + Math.cos(a) * r;
+                    const py = 42 + Math.sin(a) * r;
+                    if (a === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+            } else if (variant === 3) {
+                // Trees & watching figure
+                for (let tx = 10; tx <= 54; tx += 11) {
+                    ctx.fillRect(tx, 16, 2, 52);
+                }
+                ctx.fillStyle = '#8a0303';
+                ctx.fillRect(30, 32, 4, 24);
+            } else if (variant === 4) {
+                // "NO" scrawled huge
+                ctx.fillRect(12, 20, 3, 36);
+                ctx.beginPath();
+                ctx.moveTo(13, 22); ctx.lineTo(28, 54);
+                ctx.stroke();
+                ctx.fillRect(28, 20, 3, 36);
+                ctx.strokeRect(38, 22, 14, 32);
+            } else if (variant === 5) {
+                // Eight tally marks / pages
+                for (let t = 0; t < 8; t++) {
+                    const x = 10 + (t % 4) * 12;
+                    const y = t < 4 ? 18 : 48;
+                    ctx.fillRect(x, y, 3, 18);
+                }
+            } else if (variant === 6) {
+                // Jagged teeth / mouth
+                ctx.strokeRect(10, 26, 44, 28);
+                ctx.beginPath();
+                for (let x = 10; x < 54; x += 6) {
+                    ctx.moveTo(x, 26); ctx.lineTo(x + 3, 40); ctx.lineTo(x + 6, 26);
+                    ctx.moveTo(x, 54); ctx.lineTo(x + 3, 40); ctx.lineTo(x + 6, 54);
+                }
+                ctx.stroke();
+            } else {
+                // Frantic scribbles + red X
+                for (let s = 0; s < 14; s++) {
+                    ctx.fillRect(10, 12 + s * 4, 25 + Math.random() * 20, 2);
+                }
+                ctx.strokeStyle = '#991b1b';
+                ctx.beginPath();
+                ctx.moveTo(12, 12); ctx.lineTo(52, 72);
+                ctx.moveTo(52, 12); ctx.lineTo(12, 72);
+                ctx.stroke();
+            }
+
+            return makeNearestTexture(c);
+        }
+
+        /**
+         * Renders the jumpscare illustration inspired by the reference image onto a low-res PS1 canvas:
+         * blood-streaked pale porcelain face, hollow black eyes, wide gaping dark mouth,
+         * head-wings & shoulder wing, dark hands, and miniature porcelain doll.
+         */
+        function renderJumpscareImage(canvas) {
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Alley / background tones
+            ctx.fillStyle = '#575854';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#d9d3be';
+            ctx.fillRect(0, 0, Math.floor(w * 0.34), h);
+            ctx.fillStyle = '#3d3e3b';
+            ctx.fillRect(Math.floor(w * 0.32), 0, Math.floor(w * 0.04), h);
+            ctx.fillStyle = '#6e6f6a';
+            ctx.fillRect(Math.floor(w * 0.72), 0, Math.floor(w * 0.28), h);
+
+            // Tattered blood-stained robe body
+            ctx.fillStyle = '#5a5363';
+            ctx.beginPath();
+            ctx.moveTo(w * 0.34, h * 0.52);
+            ctx.lineTo(w * 0.78, h * 0.52);
+            ctx.lineTo(w * 0.86, h);
+            ctx.lineTo(w * 0.32, h);
+            ctx.closePath();
+            ctx.fill();
+
+            // Blood streaks on robe & hand
+            ctx.fillStyle = '#5c1115';
+            ctx.fillRect(Math.floor(w * 0.38), Math.floor(h * 0.56), 14, 46);
+            ctx.fillRect(Math.floor(w * 0.62), Math.floor(h * 0.55), 18, 52);
+            ctx.fillRect(Math.floor(w * 0.16), Math.floor(h * 0.34), 26, 22);
+
+            // Right shoulder / back wing
+            ctx.fillStyle = '#7f7d82';
+            ctx.beginPath();
+            ctx.moveTo(w * 0.72, h * 0.56);
+            ctx.quadraticCurveTo(w * 0.96, h * 0.36, w, h * 0.58);
+            ctx.lineTo(w, h * 0.84);
+            ctx.lineTo(w * 0.72, h * 0.72);
+            ctx.closePath();
+            ctx.fill();
+
+            // Head-wings sprouting from temples
+            ctx.fillStyle = '#a8a6ab';
+            ctx.beginPath();
+            ctx.moveTo(w * 0.37, h * 0.24);
+            ctx.lineTo(w * 0.23, h * 0.04);
+            ctx.lineTo(w * 0.41, h * 0.14);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(w * 0.62, h * 0.22);
+            ctx.lineTo(w * 0.86, h * 0.08);
+            ctx.lineTo(w * 0.65, h * 0.30);
+            ctx.closePath();
+            ctx.fill();
+
+            // Stringy dark hair
+            ctx.fillStyle = '#140c0e';
+            ctx.fillRect(Math.floor(w * 0.36), Math.floor(h * 0.02), Math.floor(w * 0.28), Math.floor(h * 0.65));
+
+            // Pale porcelain mask face
+            ctx.fillStyle = '#dedbd4';
+            ctx.beginPath();
+            ctx.ellipse(w * 0.51, h * 0.31, w * 0.13, h * 0.23, 0.05, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hollow pitch-black eyes & wide gaping dark mouth
+            ctx.fillStyle = '#090607';
+            ctx.beginPath();
+            ctx.ellipse(w * 0.44, h * 0.24, w * 0.032, h * 0.055, -0.1, 0, Math.PI * 2);
+            ctx.ellipse(w * 0.56, h * 0.25, w * 0.032, h * 0.055, 0.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(w * 0.41, h * 0.39);
+            ctx.quadraticCurveTo(w * 0.51, h * 0.42, w * 0.62, h * 0.39);
+            ctx.quadraticCurveTo(w * 0.59, h * 0.53, w * 0.43, h * 0.52);
+            ctx.closePath();
+            ctx.fill();
+
+            // Dark blood drips across face
+            ctx.fillStyle = '#360b0f';
+            const faceDrips = [
+                [0.44, 0.10, 4, 24],
+                [0.52, 0.11, 5, 32],
+                [0.57, 0.14, 4, 26],
+                [0.43, 0.28, 3, 22],
+                [0.57, 0.29, 3, 24],
+                [0.47, 0.48, 4, 18],
+                [0.54, 0.49, 4, 16]
+            ];
+            faceDrips.forEach(([rx, ry, dw, dh]) => {
+                ctx.fillRect(Math.floor(w * rx), Math.floor(h * ry), dw, dh);
+            });
+
+            // Hand gripping pole/edge on left
+            ctx.fillStyle = '#5c4b4e';
+            ctx.fillRect(Math.floor(w * 0.20), Math.floor(h * 0.25), 34, 24);
+            ctx.strokeStyle = '#140b0d';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(Math.floor(w * 0.20), Math.floor(h * 0.25), 34, 24);
+
+            // Miniature porcelain doll held at chest
+            ctx.fillStyle = '#d4d2cd';
+            ctx.beginPath();
+            ctx.arc(w * 0.63, h * 0.76, 13, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#191412';
+            ctx.fillRect(Math.floor(w * 0.60), Math.floor(h * 0.74), 3, 3);
+            ctx.fillRect(Math.floor(w * 0.65), Math.floor(h * 0.74), 3, 3);
+
+            ctx.fillStyle = '#7f8187';
+            ctx.beginPath();
+            ctx.moveTo(w * 0.58, h * 0.82);
+            ctx.lineTo(w * 0.68, h * 0.82);
+            ctx.lineTo(w * 0.75, h);
+            ctx.lineTo(w * 0.48, h);
+            ctx.closePath();
+            ctx.fill();
+
+            // Hand holding doll
+            ctx.fillStyle = '#542327';
+            ctx.fillRect(Math.floor(w * 0.48), Math.floor(h * 0.88), 32, 18);
+        }
+
+        /**
+         * Creates the PS1 nearest-neighbor texture for the Watcher's face:
+         * blood-streaked pale porcelain mask, hollow black eyes, wide gaping dark mouth,
+         * and dark stringy hair framing the face.
+         */
+        function createWatcherFaceTexture() {
+            const c = document.createElement('canvas');
+            c.width = 96;
+            c.height = 96;
+            const ctx = c.getContext('2d');
+
+            // Dark stringy hair background
+            ctx.fillStyle = '#0c080a';
+            ctx.fillRect(0, 0, 96, 96);
+
+            // Pale porcelain oval mask
+            ctx.fillStyle = '#dedbd4';
+            ctx.beginPath();
+            ctx.ellipse(48, 48, 25, 36, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hollow pitch-black eyes & wide gaping dark smile
+            ctx.fillStyle = '#080506';
+            ctx.beginPath();
+            ctx.ellipse(37, 38, 6.5, 9.5, -0.1, 0, Math.PI * 2);
+            ctx.ellipse(59, 38, 6.5, 9.5, 0.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(33, 58);
+            ctx.quadraticCurveTo(48, 62, 63, 58);
+            ctx.quadraticCurveTo(60, 76, 36, 75);
+            ctx.closePath();
+            ctx.fill();
+
+            // Dark blood/ink streaks dripping down the face
+            ctx.fillStyle = '#380b0f';
+            const drips = [
+                [38, 14, 5, 32],
+                [48, 12, 6, 40],
+                [56, 16, 5, 34],
+                [35, 44, 4, 24],
+                [61, 44, 4, 26],
+                [42, 72, 5, 16],
+                [53, 72, 5, 15]
+            ];
+            drips.forEach(([dx, dy, dw, dh]) => {
+                ctx.fillRect(dx, dy, dw, dh);
+            });
+
+            // Stringy hair strands hanging down sides
+            ctx.fillStyle = '#120b0d';
+            for (let s = 0; s < 10; s++) {
+                const sx = s < 5 ? 14 + s * 3 : 66 + (s - 5) * 3;
+                ctx.fillRect(sx, 10 + (s % 3) * 6, 3, 52 + (s % 4) * 8);
+            }
+
+            return makeNearestTexture(c);
+        }
+
+        /**
+         * Creates feathered grey-white blood-streaked wing texture for the head-wings and shoulder wings
+         */
+        function createWingFeatherTexture() {
+            const c = document.createElement('canvas');
+            c.width = 48;
+            c.height = 32;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = '#8b8a8e';
+            ctx.fillRect(0, 0, 48, 32);
+
+            // Feather layers & dark ink outlines
+            for (let row = 0; row < 4; row++) {
+                const y = row * 8;
+                ctx.fillStyle = row % 2 === 0 ? '#b2b1b5' : '#6c6b70';
+                ctx.fillRect(0, y, 48, 6);
+                ctx.fillStyle = '#181416';
+                ctx.fillRect(0, y + 6, 48, 2);
+
+                for (let col = 0; col < 48; col += 8) {
+                    ctx.fillRect(col + (row % 2) * 4, y, 1, 8);
+                }
+            }
+
+            // Dried dark red/black stains on wing tips
+            ctx.fillStyle = '#361114';
+            ctx.fillRect(32, 4, 14, 18);
+            ctx.fillStyle = '#1c090b';
+            ctx.fillRect(38, 8, 10, 14);
+
+            return makeNearestTexture(c);
+        }
+
+        /**
+         * Creates tattered blood-stained grey robe texture
+         */
+        function createTatteredRobeTexture() {
+            const c = document.createElement('canvas');
+            c.width = 48;
+            c.height = 64;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = '#4e4c52';
+            ctx.fillRect(0, 0, 48, 64);
+
+            // Vertical cloth folds
+            for (let x = 0; x < 48; x += 4) {
+                ctx.fillStyle = (x % 8 === 0) ? '#37353b' : '#636068';
+                ctx.fillRect(x, 0, 2, 64);
+            }
+
+            // Heavy dark crimson/brown blood splatters across shoulders & chest
+            const stains = [
+                [4, 4, 12, 22],
+                [30, 6, 14, 26],
+                [14, 18, 16, 14],
+                [8, 38, 10, 18],
+                [28, 42, 12, 16]
+            ];
+            stains.forEach(([sx, sy, sw, sh]) => {
+                ctx.fillStyle = '#330e12';
+                ctx.fillRect(sx, sy, sw, sh);
+                ctx.fillStyle = '#1c0709';
+                ctx.fillRect(sx + 2, sy + 2, sw - 4, sh - 4);
+            });
+
+            return makeNearestTexture(c);
+        }
+
+        /**
+         * Creates miniature porcelain doll texture held by the Watcher
+         */
+        function createPorcelainDollTexture() {
+            const c = document.createElement('canvas');
+            c.width = 32;
+            c.height = 48;
+            const ctx = c.getContext('2d');
+
+            ctx.clearRect(0, 0, 32, 48);
+
+            // Brown wavy doll hair
+            ctx.fillStyle = '#3d2c1e';
+            ctx.beginPath();
+            ctx.arc(16, 11, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pale porcelain doll face
+            ctx.fillStyle = '#e6e4df';
+            ctx.beginPath();
+            ctx.arc(16, 12, 5.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tiny doll eyes & mouth
+            ctx.fillStyle = '#111111';
+            ctx.fillRect(13, 11, 2, 2);
+            ctx.fillRect(17, 11, 2, 2);
+            ctx.fillRect(15, 15, 2, 1);
+
+            // Grey/white Victorian doll dress
+            ctx.fillStyle = '#8b8d94';
+            ctx.beginPath();
+            ctx.moveTo(11, 18);
+            ctx.lineTo(21, 18);
+            ctx.lineTo(26, 42);
+            ctx.lineTo(6, 42);
+            ctx.closePath();
+            ctx.fill();
+
+            // White collar & lace trim
+            ctx.fillStyle = '#dcdad5';
+            ctx.fillRect(11, 18, 10, 3);
+            ctx.fillRect(7, 39, 18, 2);
+
+            return makeNearestTexture(c);
+        }
+
+        /**
+         * Injects authentic PS1 low-precision vertex snapping (jitter) into standard Three.js materials
+         */
+        function applyPS1VertexJitter(material, snapResolution = 160.0) {
+            material.onBeforeCompile = (shader) => {
+                shader.uniforms.uSnapRes = { value: new THREE.Vector2(snapResolution, snapResolution * 0.75) };
+                shader.vertexShader = `
+                    uniform vec2 uSnapRes;
+                ` + shader.vertexShader;
+
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <project_vertex>',
+                    `
+                    vec4 mvPosition = vec4( transformed, 1.0 );
+                    #ifdef USE_INSTANCING
+                        mvPosition = instanceMatrix * mvPosition;
+                    #endif
+                    mvPosition = modelViewMatrix * mvPosition;
+                    gl_Position = projectionMatrix * mvPosition;
+
+                    // PS1 affine-style vertex snapping in clip space
+                    vec4 snapped = gl_Position;
+                    snapped.xyz = gl_Position.xyz / gl_Position.w;
+                    snapped.xy = floor(uSnapRes * snapped.xy) / uSnapRes;
+                    snapped.xyz *= gl_Position.w;
+                    gl_Position = snapped;
+                    `
+                );
+            };
+            return material;
+        }
+
+        // ==========================================
+        // 4. MAIN GAME APPLICATION
+        // ==========================================
+        class HorrorForestGame {
+            constructor() {
+                this.container = document.getElementById('game-container');
+                this.audio = new HorrorAudioEngine();
+
+                // Game State
+                this.isPlaying = false;
+                this.isWon = false;
+                this.collectedCount = 0;
+                this.stamina = 1.0;
+                this.isExhausted = false;
+                this.flashlightOn = true;
+
+                // Input State
+                this.keys = {};
+                this.yaw = 0;
+                this.pitch = 0;
+                this.bobTimer = 0;
+                this.flashlightTargetPos = new THREE.Vector3();
+                this.flashlightTargetLook = new THREE.Vector3();
+
+                // World Entities
+                this.colliders = []; // { x, z, radius }
+                this.treeList = [];  // { x, z, trunkRadius }
+                this.pages = [];     // { mesh, worldPos, message, collected, index }
+                this.targetedPage = null;
+
+                // Stalker Villain ("The Watcher") State
+                this.watcher = null;
+                this.watcherHead = null;
+                this.watcherLeftWing = null;
+                this.watcherRightWing = null;
+                this.watcherActive = false;
+                this.watcherVisible = false;
+                this.watcherSpottedThisCycle = false;
+                // Close-range Jumpscare, Random Scream & Background Cry Timers
+                this.isCloseScareActive = false;
+                this.closeScareTimer = 0;
+                this.closeScareCooldown = 14 + Math.random() * 12;
+                this.ambientScreamCooldown = 11 + Math.random() * 14;
+                this.cryCooldown = 16 + Math.random() * 18;
+                this.isTouchJumpscareActive = false;
+                this.touchJumpscareTimeout = null;
+
+                // DOM Elements
+                this.elPageCount = document.getElementById('page-count');
+                this.elReticle = document.getElementById('reticle');
+                this.elPrompt = document.getElementById('interact-prompt');
+                this.elToast = document.getElementById('page-toast');
+                this.elTouchJumpscare = document.getElementById('touch-jumpscare');
+                this.elJumpscareCanvas = document.getElementById('jumpscare-canvas');
+                this.elJumpscareImage = document.getElementById('jumpscare-image');
+                this.jumpscareImageReady = false;
+                this.elStaminaWrap = document.getElementById('stamina-wrapper');
+                this.elStaminaBar = document.getElementById('stamina-bar');
+                this.elStartOverlay = document.getElementById('start-overlay');
+                this.elWinOverlay = document.getElementById('win-overlay');
+                this.elCrtOverlay = document.getElementById('crt-overlay');
+                this.elStalkerStatic = document.getElementById('stalker-static');
+
+                renderJumpscareImage(this.elJumpscareCanvas);
+                if (this.elJumpscareImage) {
+                    this.elJumpscareImage.addEventListener('load', () => {
+                        this.jumpscareImageReady = true;
+                        this.elJumpscareImage.classList.add('loaded');
+                        if (this.elJumpscareCanvas) {
+                            this.elJumpscareCanvas.style.display = 'none';
+                        }
+                    });
+                    this.elJumpscareImage.addEventListener('error', () => {
+                        this.jumpscareImageReady = false;
+                        this.elJumpscareImage.classList.remove('loaded');
+                        if (this.elJumpscareCanvas) {
+                            this.elJumpscareCanvas.style.display = 'block';
+                        }
+                    });
+                    if (this.elJumpscareImage.complete && this.elJumpscareImage.naturalWidth > 0) {
+                        this.jumpscareImageReady = true;
+                        this.elJumpscareImage.classList.add('loaded');
+                        if (this.elJumpscareCanvas) {
+                            this.elJumpscareCanvas.style.display = 'none';
+                        }
+                    }
+                }
+
+                this.toastTimeout = null;
+                this.clock = new THREE.Clock();
+
+                this.initThree();
+                this.buildEnvironment();
+                this.buildWatcherVillain();
+                this.bindEvents();
+            }
+
+            initThree() {
+                // Scene with heavy dark exponential fog
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x05070a);
+                this.scene.fog = new THREE.FogExp2(0x05070a, 0.048);
+
+                // First-person Camera
+                this.camera = new THREE.PerspectiveCamera(68, PS1_WIDTH / PS1_HEIGHT, 0.1, 75);
+                this.camera.position.set(0, PLAYER_HEIGHT, 0);
+                this.camera.rotation.order = 'YXZ';
+
+                // Low-resolution PS1 Renderer (no antialiasing for raw pixels)
+                this.renderer = new THREE.WebGLRenderer({
+                    antialias: false,
+                    powerPreference: 'high-performance'
+                });
+                this.renderer.setSize(PS1_WIDTH, PS1_HEIGHT, false);
+                this.renderer.setPixelRatio(1);
+                this.container.appendChild(this.renderer.domElement);
+
+                // Subtle eerie moon/ambient light so silhouettes are faintly readable
+                const ambient = new THREE.AmbientLight(0x161d29, 0.42);
+                this.scene.add(ambient);
+
+                const moonLight = new THREE.DirectionalLight(0x283852, 0.28);
+                moonLight.position.set(30, 60, -25);
+                this.scene.add(moonLight);
+
+                // Handheld Flashlight (SpotLight + warm fill)
+                this.flashlight = new THREE.SpotLight(0xfff4d6, 2.8, 34, Math.PI * 0.21, 0.48, 1.35);
+                this.flashlight.position.copy(this.camera.position);
+                this.scene.add(this.flashlight);
+                this.scene.add(this.flashlight.target);
+
+                // Faint bounce light right around the player
+                this.playerGlow = new THREE.PointLight(0x8a99ad, 0.32, 6.5);
+                this.scene.add(this.playerGlow);
+            }
+
+            buildEnvironment() {
+                // Clear previous world objects if restarting
+                const toRemove = [];
+                this.scene.traverse((child) => {
+                    if (child.userData && child.userData.isWorldEntity) {
+                        toRemove.push(child);
+                    }
+                });
+                toRemove.forEach((obj) => this.scene.remove(obj));
+
+                this.colliders = [];
+                this.treeList = [];
+                this.pages = [];
+
+                // Shared PS1 Materials
+                const groundTex = createGroundTexture();
+                const barkTex = createBarkTexture();
+                const foliageTex = createFoliageTexture();
+                const stoneTex = createStoneTexture();
+                const rustTex = createRustMetalTexture();
+
+                const groundMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: groundTex,
+                    dithering: true
+                }), 180.0);
+
+                const barkMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: barkTex
+                }), 150.0);
+
+                const foliageMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: foliageTex,
+                    side: THREE.DoubleSide
+                }), 150.0);
+
+                const stoneMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: stoneTex
+                }), 150.0);
+
+                const rustMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: rustTex
+                }), 150.0);
+
+                // 1. Forest Floor
+                const groundGeo = new THREE.PlaneGeometry(WORLD_RADIUS * 2.4, WORLD_RADIUS * 2.4, 48, 48);
+                groundGeo.rotateX(-Math.PI / 2);
+                const ground = new THREE.Mesh(groundGeo, groundMat);
+                ground.userData.isWorldEntity = true;
+                this.scene.add(ground);
+
+                // 2. Perimeter Boundary Wall of dense dark trees/fog barrier
+                for (let i = 0; i < 90; i++) {
+                    const angle = (i / 90) * Math.PI * 2;
+                    const dist = WORLD_RADIUS + 2 + (i % 3) * 2.5;
+                    const x = Math.cos(angle) * dist;
+                    const z = Math.sin(angle) * dist;
+                    this.spawnTree(x, z, barkMat, foliageMat, false, 1.35);
+                }
+
+                // 3. Eerie Landmarks for Player Orientation
+                this.buildLandmarks(stoneMat, barkMat, rustMat);
+
+                // 4. Generate Forest Trees (keeping spawn clearing open)
+                const treePositions = [];
+                const targetTrees = 260;
+                let attempts = 0;
+
+                while (treePositions.length < targetTrees && attempts < 2500) {
+                    attempts++;
+                    const r = 8 + Math.sqrt(Math.random()) * (WORLD_RADIUS - 10);
+                    const theta = Math.random() * Math.PI * 2;
+                    const x = Math.cos(theta) * r;
+                    const z = Math.sin(theta) * r;
+
+                    // Keep minimum spacing from other colliders
+                    let tooClose = false;
+                    for (let c of this.colliders) {
+                        const dx = x - c.x;
+                        const dz = z - c.z;
+                        if (dx * dx + dz * dz < 14.5) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+                    if (tooClose) continue;
+
+                    const isDeadTree = Math.random() < 0.24;
+                    const scale = 0.85 + Math.random() * 0.65;
+                    const treeObj = this.spawnTree(x, z, barkMat, foliageMat, isDeadTree, scale);
+                    treePositions.push(treeObj);
+                    this.treeList.push(treeObj);
+                }
+
+                // 5. Scatter Low-Poly Rocks & Dark Bushes
+                const rockGeo = new THREE.DodecahedronGeometry(0.65, 0);
+                for (let i = 0; i < 85; i++) {
+                    const r = 6 + Math.random() * (WORLD_RADIUS - 8);
+                    const theta = Math.random() * Math.PI * 2;
+                    const x = Math.cos(theta) * r;
+                    const z = Math.sin(theta) * r;
+
+                    const rock = new THREE.Mesh(rockGeo, stoneMat);
+                    const s = 0.6 + Math.random() * 1.4;
+                    rock.scale.set(s, s * 0.65, s);
+                    rock.position.set(x, 0.25 * s, z);
+                    rock.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
+                    rock.userData.isWorldEntity = true;
+                    this.scene.add(rock);
+
+                    if (s > 1.2) {
+                        this.colliders.push({ x, z, radius: 0.65 * s });
+                    }
+                }
+
+                // 6. Place the 8 Collectible Pages on well-distributed trees across the forest
+                this.placeEightPages(treePositions);
+            }
+
+            spawnTree(x, z, barkMat, foliageMat, isDeadTree = false, scale = 1.0) {
+                const group = new THREE.Group();
+                group.position.set(x, 0, z);
+                group.userData.isWorldEntity = true;
+
+                const trunkHeight = (7.5 + Math.random() * 4.5) * scale;
+                const trunkRadius = (0.34 + Math.random() * 0.16) * scale;
+
+                const trunkGeo = new THREE.CylinderGeometry(trunkRadius * 0.55, trunkRadius, trunkHeight, 6, 3);
+                const trunk = new THREE.Mesh(trunkGeo, barkMat);
+                trunk.position.y = trunkHeight * 0.5;
+                trunk.rotation.y = Math.random() * Math.PI * 2;
+                group.add(trunk);
+
+                if (isDeadTree) {
+                    // Crooked dead branches
+                    for (let b = 0; b < 3; b++) {
+                        const branchLen = (1.6 + Math.random() * 1.4) * scale;
+                        const branchGeo = new THREE.CylinderGeometry(0.05 * scale, 0.13 * scale, branchLen, 5);
+                        const branch = new THREE.Mesh(branchGeo, barkMat);
+                        const ang = (b / 3) * Math.PI * 2 + Math.random();
+                        branch.position.set(
+                            Math.cos(ang) * trunkRadius * 1.3,
+                            trunkHeight * (0.55 + b * 0.14),
+                            Math.sin(ang) * trunkRadius * 1.3
+                        );
+                        branch.rotation.z = Math.cos(ang) * -0.75;
+                        branch.rotation.x = Math.sin(ang) * 0.75;
+                        group.add(branch);
+                    }
+                } else {
+                    // Layered low-poly PS1 pine needle cones
+                    const tiers = 3;
+                    for (let t = 0; t < tiers; t++) {
+                        const tierRatio = t / tiers;
+                        const coneRadius = (2.5 - tierRatio * 0.85) * scale;
+                        const coneHeight = (3.4 - tierRatio * 0.5) * scale;
+                        const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 6, 1);
+                        const cone = new THREE.Mesh(coneGeo, foliageMat);
+                        cone.position.y = trunkHeight * (0.46 + t * 0.22);
+                        cone.rotation.y = t * 0.65;
+                        group.add(cone);
+                    }
+                }
+
+                this.scene.add(group);
+                this.colliders.push({ x, z, radius: trunkRadius * 1.05 });
+
+                return { x, z, trunkRadius };
+            }
+
+            buildLandmarks(stoneMat, barkMat, rustMat) {
+                // Landmark 1: Old Stone Well (North-East)
+                const wellX = 32, wellZ = -28;
+                const wellGroup = new THREE.Group();
+                wellGroup.position.set(wellX, 0, wellZ);
+                wellGroup.userData.isWorldEntity = true;
+
+                const wellWall = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 1.1, 8, 1, true), stoneMat);
+                wellWall.position.y = 0.55;
+                wellGroup.add(wellWall);
+
+                const pit = new THREE.Mesh(
+                    new THREE.CircleGeometry(1.38, 8),
+                    new THREE.MeshBasicMaterial({ color: 0x020203 })
+                );
+                pit.rotation.x = -Math.PI / 2;
+                pit.position.y = 0.4;
+                wellGroup.add(pit);
+
+                [-1.35, 1.35].forEach((px) => {
+                    const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.3, 0.18), barkMat);
+                    post.position.set(px, 1.15, 0);
+                    wellGroup.add(post);
+                });
+
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.1, 4), barkMat);
+                roof.position.y = 2.65;
+                roof.rotation.y = Math.PI / 4;
+                wellGroup.add(roof);
+
+                this.scene.add(wellGroup);
+                this.colliders.push({ x: wellX, z: wellZ, radius: 1.65 });
+
+                // Landmark 2: Rusted Oil Barrels (South-West)
+                const barrelCluster = [
+                    { x: -36, z: 30 },
+                    { x: -34.6, z: 31.1 },
+                    { x: -36.8, z: 31.6 }
+                ];
+                barrelCluster.forEach((b, idx) => {
+                    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.25, 8), rustMat);
+                    barrel.position.set(b.x, 0.625, b.z);
+                    if (idx === 2) {
+                        barrel.rotation.z = Math.PI / 2;
+                        barrel.position.y = 0.45;
+                    }
+                    barrel.userData.isWorldEntity = true;
+                    this.scene.add(barrel);
+                    this.colliders.push({ x: b.x, z: b.z, radius: 0.6 });
+                });
+
+                // Landmark 3: Abandoned Cabin Ruin Walls (North-West)
+                const cabinX = -42, cabinZ = -34;
+                const cabinGroup = new THREE.Group();
+                cabinGroup.position.set(cabinX, 0, cabinZ);
+                cabinGroup.userData.isWorldEntity = true;
+
+                const backWall = new THREE.Mesh(new THREE.BoxGeometry(6.5, 3.2, 0.35), barkMat);
+                backWall.position.set(0, 1.6, -2.5);
+                cabinGroup.add(backWall);
+
+                const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.7, 5.0), barkMat);
+                sideWall.position.set(-3.1, 1.35, 0);
+                cabinGroup.add(sideWall);
+
+                this.scene.add(cabinGroup);
+                this.colliders.push({ x: cabinX, z: cabinZ - 2.5, radius: 2.2 });
+                this.colliders.push({ x: cabinX - 3.1, z: cabinZ, radius: 1.8 });
+
+                // Landmark 4: Stone Monolith Pillars (South-East)
+                const pillarX = 38, pillarZ = 36;
+                for (let i = 0; i < 4; i++) {
+                    const ang = (i / 4) * Math.PI * 2;
+                    const px = pillarX + Math.cos(ang) * 3.2;
+                    const pz = pillarZ + Math.sin(ang) * 3.2;
+                    const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 4.2 + (i % 2) * 1.1, 0.9), stoneMat);
+                    pillar.position.set(px, 2.1, pz);
+                    pillar.rotation.z = (i % 2 === 0 ? 1 : -1) * 0.06;
+                    pillar.userData.isWorldEntity = true;
+                    this.scene.add(pillar);
+                    this.colliders.push({ x: px, z: pz, radius: 0.75 });
+                }
+            }
+
+            /**
+             * Builds the 3D PS1 Stalker Villain ("The Watcher") matching the Angel Engine face:
+             * - Blood-streaked pale porcelain face with hollow black eyes & gaping dark smile
+             * - Feathered head-wings sprouting from both temples & tattered back wings
+             * - Blood-stained grey robe & small porcelain doll clutched to its chest
+             */
+            buildWatcherVillain() {
+                if (this.watcher) {
+                    this.scene.remove(this.watcher);
+                }
+
+                const faceTex = createWatcherFaceTexture();
+                const wingTex = createWingFeatherTexture();
+                const robeTex = createTatteredRobeTexture();
+                const dollTex = createPorcelainDollTexture();
+
+                const faceMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: faceTex,
+                    side: THREE.DoubleSide
+                }), 150.0);
+
+                const wingMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: wingTex,
+                    side: THREE.DoubleSide
+                }), 150.0);
+
+                const robeMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: robeTex
+                }), 150.0);
+
+                const darkHairMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    color: 0x0b0809
+                }), 150.0);
+
+                const handMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    color: 0x3b2a2c
+                }), 150.0);
+
+                const dollMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                    map: dollTex,
+                    transparent: true,
+                    alphaTest: 0.2,
+                    side: THREE.DoubleSide
+                }), 150.0);
+
+                this.watcher = new THREE.Group();
+                this.watcher.visible = false;
+
+                // Tattered blood-stained robe torso & lower body
+                const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.42, 1.58, 7), robeMat);
+                torso.position.y = 0.79;
+                this.watcher.add(torso);
+
+                // Tattered shoulder wings protruding from back
+                const backWingGeo = new THREE.PlaneGeometry(0.85, 0.52, 2, 2);
+                const backWingLeft = new THREE.Mesh(backWingGeo, wingMat);
+                backWingLeft.position.set(-0.46, 1.28, -0.14);
+                backWingLeft.rotation.set(0.15, -0.35, -0.35);
+                this.watcher.add(backWingLeft);
+
+                const backWingRight = new THREE.Mesh(backWingGeo, wingMat);
+                backWingRight.position.set(0.46, 1.28, -0.14);
+                backWingRight.rotation.set(0.15, 0.35, 0.35);
+                this.watcher.add(backWingRight);
+
+                // Miniature porcelain doll held against chest
+                const dollMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.48), dollMat);
+                dollMesh.position.set(0.05, 1.12, 0.28);
+                dollMesh.rotation.z = -0.22;
+                this.watcher.add(dollMesh);
+
+                // Dark blood-stained hands clutching the doll & peeking posture
+                const leftHand = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.16, 0.12), handMat);
+                leftHand.position.set(-0.22, 1.44, 0.26);
+                this.watcher.add(leftHand);
+
+                const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.11, 0.12), handMat);
+                rightHand.position.set(0.04, 1.02, 0.31);
+                this.watcher.add(rightHand);
+
+                // Head & Face Assembly
+                this.watcherHead = new THREE.Group();
+                this.watcherHead.position.set(0, 1.76, 0.04);
+
+                // Dark hair volume behind & around face
+                const hairBack = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.56, 0.32), darkHairMat);
+                hairBack.position.set(0, -0.04, -0.06);
+                this.watcherHead.add(hairBack);
+
+                // Exact face plane facing +Z
+                const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.52, 2, 2), faceMat);
+                facePlane.position.set(0, 0, 0.11);
+                this.watcherHead.add(facePlane);
+
+                // Signature feathered head-wings sprouting from both temples
+                const headWingGeo = new THREE.PlaneGeometry(0.46, 0.22, 2, 1);
+                this.watcherLeftWing = new THREE.Mesh(headWingGeo, wingMat);
+                this.watcherLeftWing.position.set(-0.34, 0.12, 0.02);
+                this.watcherLeftWing.rotation.z = -0.45;
+                this.watcherHead.add(this.watcherLeftWing);
+
+                this.watcherRightWing = new THREE.Mesh(headWingGeo, wingMat);
+                this.watcherRightWing.position.set(0.34, 0.12, 0.02);
+                this.watcherRightWing.rotation.z = 0.45;
+                this.watcherHead.add(this.watcherRightWing);
+
+                this.watcher.add(this.watcherHead);
+                this.scene.add(this.watcher);
+            }
+
+            placeEightPages(treePositions) {
+                // Divide forest into 8 angular sectors so pages are spread out logically
+                const chosenTrees = [];
+                for (let sector = 0; sector < TOTAL_PAGES; sector++) {
+                    const minAng = (sector / TOTAL_PAGES) * Math.PI * 2 - Math.PI;
+                    const maxAng = ((sector + 1) / TOTAL_PAGES) * Math.PI * 2 - Math.PI;
+
+                    const candidates = treePositions.filter((t) => {
+                        const dist = Math.hypot(t.x, t.z);
+                        if (dist < 16 || dist > WORLD_RADIUS - 12) return false;
+                        const ang = Math.atan2(t.z, t.x);
+                        return ang >= minAng && ang < maxAng;
+                    });
+
+                    if (candidates.length > 0) {
+                        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+                        chosenTrees.push(pick);
+                    } else if (treePositions[sector * 10]) {
+                        chosenTrees.push(treePositions[sector * 10]);
+                    }
+                }
+
+                chosenTrees.slice(0, TOTAL_PAGES).forEach((tree, idx) => {
+                    const pageTex = createCreepyPageTexture(idx);
+                    const pageMat = applyPS1VertexJitter(new THREE.MeshLambertMaterial({
+                        map: pageTex,
+                        side: THREE.DoubleSide
+                    }), 160.0);
+
+                    const pageGeo = new THREE.PlaneGeometry(0.56, 0.74, 2, 2);
+                    const pageMesh = new THREE.Mesh(pageGeo, pageMat);
+
+                    // Attach page to the side of the trunk facing somewhat inward so player can spot it
+                    const faceAngle = Math.atan2(-tree.z, -tree.x) + (Math.random() - 0.5) * 1.1;
+                    const offsetDist = tree.trunkRadius * 1.04 + 0.03;
+
+                    pageMesh.position.set(
+                        tree.x + Math.cos(faceAngle) * offsetDist,
+                        1.55,
+                        tree.z + Math.sin(faceAngle) * offsetDist
+                    );
+                    pageMesh.rotation.y = faceAngle + Math.PI / 2;
+                    pageMesh.rotation.z = (Math.random() - 0.5) * 0.18;
+                    pageMesh.userData.isWorldEntity = true;
+
+                    this.scene.add(pageMesh);
+
+                    this.pages.push({
+                        index: idx,
+                        mesh: pageMesh,
+                        worldPos: pageMesh.position.clone(),
+                        message: PAGE_MESSAGES[idx % PAGE_MESSAGES.length],
+                        collected: false
+                    });
+                });
+            }
+
+            // ==========================================
+            // 5. CONTROLS & POINTER LOCK
+            // ==========================================
+            bindEvents() {
+                const startBtn = document.getElementById('play-btn');
+                const restartBtn = document.getElementById('restart-btn');
+
+                startBtn.addEventListener('click', () => {
+                    this.audio.init();
+                    this.requestPointerLock();
+                });
+
+                restartBtn.addEventListener('click', () => {
+                    this.resetGame();
+                    this.requestPointerLock();
+                });
+
+                // Clicking canvas while playing either locks pointer or collects targeted page
+                this.renderer.domElement.addEventListener('mousedown', (e) => {
+                    if (this.isWon) return;
+                    this.audio.init();
+
+                    if (document.pointerLockElement !== this.renderer.domElement) {
+                        this.requestPointerLock();
+                    } else if (e.button === 0 && this.targetedPage) {
+                        this.collectPage(this.targetedPage);
+                    }
+                });
+
+                document.addEventListener('pointerlockchange', () => {
+                    const locked = document.pointerLockElement === this.renderer.domElement;
+                    if (locked && !this.isWon) {
+                        this.isPlaying = true;
+                        this.elStartOverlay.classList.add('hidden');
+                    } else if (!locked && !this.isWon) {
+                        this.isPlaying = false;
+                        this.elStartOverlay.classList.remove('hidden');
+                        document.getElementById('play-btn').textContent = 'RESUME GAME';
+                    }
+                });
+
+                // Mouse look
+                document.addEventListener('mousemove', (e) => {
+                    if (!this.isPlaying || document.pointerLockElement !== this.renderer.domElement) return;
+                    const sensitivity = 0.0024;
+                    this.yaw -= e.movementX * sensitivity;
+                    this.pitch -= e.movementY * sensitivity;
+                    const maxPitch = Math.PI * 0.44;
+                    this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch));
+                });
+
+                // Keyboard input
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+
+                    if (!this.isPlaying) return;
+
+                    if (e.code === 'KeyE' && this.targetedPage) {
+                        this.collectPage(this.targetedPage);
+                    } else if (e.code === 'KeyF') {
+                        this.toggleFlashlight();
+                    } else if (e.code === 'KeyC') {
+                        this.elCrtOverlay.classList.toggle('hidden-crt');
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+
+                // Mobile / Touch fallback listeners
+                document.querySelectorAll('.touch-btn').forEach((btn) => {
+                    const code = btn.dataset.key;
+                    btn.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        this.audio.init();
+                        this.isPlaying = true;
+                        this.elStartOverlay.classList.add('hidden');
+                        this.keys[code] = true;
+                    });
+                    btn.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        this.keys[code] = false;
+                    });
+                });
+
+                // Touch drag to look on mobile
+                let lastTouchX = 0, lastTouchY = 0;
+                this.renderer.domElement.addEventListener('touchstart', (e) => {
+                    if (e.touches.length > 0) {
+                        lastTouchX = e.touches[0].clientX;
+                        lastTouchY = e.touches[0].clientY;
+                    }
+                }, { passive: true });
+
+                this.renderer.domElement.addEventListener('touchmove', (e) => {
+                    if (e.touches.length > 0 && !this.isWon) {
+                        const dx = e.touches[0].clientX - lastTouchX;
+                        const dy = e.touches[0].clientY - lastTouchY;
+                        lastTouchX = e.touches[0].clientX;
+                        lastTouchY = e.touches[0].clientY;
+                        this.yaw -= dx * 0.005;
+                        this.pitch = Math.max(-1.2, Math.min(1.2, this.pitch - dy * 0.005));
+                    }
+                }, { passive: true });
+
+                document.getElementById('touch-take').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (this.targetedPage) this.collectPage(this.targetedPage);
+                });
+
+                document.getElementById('touch-light').addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.toggleFlashlight();
+                });
+            }
+
+            requestPointerLock() {
+                try {
+                    this.renderer.domElement.requestPointerLock();
+                } catch (err) {
+                    // Fallback if pointer lock is blocked in an iframe sandbox
+                    this.isPlaying = true;
+                    this.elStartOverlay.classList.add('hidden');
+                }
+            }
+
+            toggleFlashlight() {
+                this.flashlightOn = !this.flashlightOn;
+                this.flashlight.intensity = this.flashlightOn ? 2.8 : 0.0;
+                this.audio.playFlashlightClick();
+            }
+
+            // ==========================================
+            // 6. GAMEPLAY LOGIC (MOVEMENT, COLLISION, PICKUP)
+            // ==========================================
+            updatePlayer(dt) {
+                // Apply camera rotation
+                this.camera.rotation.y = this.yaw;
+                this.camera.rotation.x = this.pitch;
+
+                // Movement axes
+                let forward = 0;
+                let right = 0;
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) forward += 1;
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) forward -= 1;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) right += 1;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) right -= 1;
+
+                const isMoving = forward !== 0 || right !== 0;
+                const wantsSprint = (this.keys['ShiftLeft'] || this.keys['ShiftRight']) && isMoving && !this.isExhausted;
+
+                // Stamina management
+                if (wantsSprint) {
+                    this.stamina = Math.max(0, this.stamina - dt * 0.34);
+                    if (this.stamina <= 0.01) {
+                        this.isExhausted = true;
+                        this.elStaminaBar.classList.add('exhausted');
+                    }
+                } else {
+                    this.stamina = Math.min(1, this.stamina + dt * 0.22);
+                    if (this.isExhausted && this.stamina >= 0.35) {
+                        this.isExhausted = false;
+                        this.elStaminaBar.classList.remove('exhausted');
+                    }
+                }
+
+                // Update Stamina HUD visibility
+                if (this.stamina < 0.99) {
+                    this.elStaminaWrap.classList.add('visible');
+                    this.elStaminaBar.style.width = `${Math.floor(this.stamina * 100)}%`;
+                } else {
+                    this.elStaminaWrap.classList.remove('visible');
+                }
+
+                const speed = wantsSprint ? SPRINT_SPEED : WALK_SPEED;
+
+                // Compute horizontal movement vector relative to camera yaw
+                const forwardVec = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+                const rightVec = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+
+                const moveDir = new THREE.Vector3();
+                moveDir.addScaledVector(forwardVec, forward);
+                moveDir.addScaledVector(rightVec, right);
+                if (moveDir.lengthSq() > 0) {
+                    moveDir.normalize();
+                }
+
+                let nextX = this.camera.position.x + moveDir.x * speed * dt;
+                let nextZ = this.camera.position.z + moveDir.z * speed * dt;
+
+                // Keep player within forest perimeter
+                const distFromCenter = Math.hypot(nextX, nextZ);
+                if (distFromCenter > WORLD_RADIUS - 1.5) {
+                    const clampScale = (WORLD_RADIUS - 1.5) / distFromCenter;
+                    nextX *= clampScale;
+                    nextZ *= clampScale;
+                }
+
+                // Circle-vs-Circle Collision Resolution against trees & landmarks
+                for (let i = 0; i < this.colliders.length; i++) {
+                    const col = this.colliders[i];
+                    const dx = nextX - col.x;
+                    const dz = nextZ - col.z;
+                    const distSq = dx * dx + dz * dz;
+                    const minDist = PLAYER_RADIUS + col.radius;
+
+                    if (distSq < minDist * minDist) {
+                        const dist = Math.sqrt(distSq) || 0.001;
+                        const overlap = minDist - dist;
+                        nextX += (dx / dist) * overlap;
+                        nextZ += (dz / dist) * overlap;
+                    }
+                }
+
+                this.camera.position.x = nextX;
+                this.camera.position.z = nextZ;
+
+                // Head-bobbing & Footstep Audio
+                if (isMoving) {
+                    const bobFreq = wantsSprint ? 13.5 : 8.8;
+                    const bobAmp = wantsSprint ? 0.085 : 0.048;
+                    const prevSin = Math.sin(this.bobTimer);
+                    this.bobTimer += dt * bobFreq;
+                    const curSin = Math.sin(this.bobTimer);
+
+                    this.camera.position.y = PLAYER_HEIGHT + curSin * bobAmp;
+
+                    // Trigger footstep at bottom of step cycle
+                    if (prevSin >= -0.7 && curSin < -0.7) {
+                        this.audio.playFootstep(wantsSprint);
+                    }
+                } else {
+                    // Subtle breathing sway
+                    this.bobTimer += dt * 1.8;
+                    this.camera.position.y += (PLAYER_HEIGHT + Math.sin(this.bobTimer) * 0.015 - this.camera.position.y) * 8 * dt;
+                }
+
+                // Update Handheld Flashlight with smooth realistic lag
+                const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                const rightHandOffset = new THREE.Vector3(0.22, -0.18, -0.25).applyQuaternion(this.camera.quaternion);
+                this.flashlightTargetPos.copy(this.camera.position).add(rightHandOffset);
+                this.flashlight.position.lerp(this.flashlightTargetPos, Math.min(1, dt * 18));
+
+                this.flashlightTargetLook.copy(this.camera.position).addScaledVector(lookDir, 12);
+                this.flashlight.target.position.lerp(this.flashlightTargetLook, Math.min(1, dt * 14));
+                this.flashlight.target.updateMatrixWorld();
+
+                this.playerGlow.position.copy(this.camera.position);
+            }
+
+            checkPageInteraction() {
+                const camPos = this.camera.position;
+                const camDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+
+                let bestCandidate = null;
+                let bestDot = 0.86; // Cone of ~30 degrees around center reticle
+
+                for (const page of this.pages) {
+                    if (page.collected) continue;
+
+                    const toPage = new THREE.Vector3().subVectors(page.worldPos, camPos);
+                    const dist = toPage.length();
+
+                    if (dist <= 3.6) {
+                        toPage.normalize();
+                        const dot = camDir.dot(toPage);
+                        if (dot > bestDot) {
+                            bestDot = dot;
+                            bestCandidate = page;
+                        }
+                    }
+                }
+
+                this.targetedPage = bestCandidate;
+
+                if (this.targetedPage) {
+                    this.elReticle.classList.add('active');
+                    this.elPrompt.classList.add('visible');
+                } else {
+                    this.elReticle.classList.remove('active');
+                    this.elPrompt.classList.remove('visible');
+                }
+            }
+
+            collectPage(page) {
+                if (!page || page.collected) return;
+
+                page.collected = true;
+                page.mesh.visible = false;
+                this.collectedCount++;
+                this.targetedPage = null;
+
+                this.elReticle.classList.remove('active');
+                this.elPrompt.classList.remove('visible');
+                this.elPageCount.textContent = this.collectedCount;
+
+                // Audio feedback & escalating tension drone
+                this.audio.playPagePickup(this.collectedCount);
+                this.audio.updateTension(this.collectedCount);
+
+                // Show creepy note text toast
+                this.showToast(`"${page.message}" (${this.collectedCount}/8)`);
+
+                // Slightly thicken fog as dread builds
+                this.scene.fog.density = 0.048 + (this.collectedCount / TOTAL_PAGES) * 0.016;
+
+                // Activate the stalking villain immediately upon picking up the first page
+                if (!this.watcherActive) {
+                    this.watcherActive = true;
+                    this.repositionWatcher(true);
+                } else if (Math.random() < 0.45 && !this.isCloseScareActive) {
+                    // Chance to scream in the distance or trigger a close-range scare right after grabbing a page
+                    if (Math.random() < 0.5) {
+                        this.triggerCloseScare();
+                    } else {
+                        this.triggerRandomDistantScream();
+                    }
+                }
+
+                if (this.collectedCount >= TOTAL_PAGES) {
+                    this.triggerWin();
+                }
+            }
+
+            /**
+             * Triggers a random distant horrifying shriek from the woods,
+             * spawning the Watcher randomly in the fog/trees if not already close.
+             */
+            triggerRandomDistantScream() {
+                this.ambientScreamCooldown = Math.max(12, 24 - this.collectedCount * 1.1) + Math.random() * 14;
+                this.audio.playHorrorScream(false);
+
+                // Brief VHS static flicker from the distant shriek
+                this.elStalkerStatic.style.opacity = '0.38';
+                setTimeout(() => {
+                    if (!this.isCloseScareActive) {
+                        this.elStalkerStatic.style.opacity = '0';
+                    }
+                }, 420);
+
+                // Randomly spawn or relocate the Watcher somewhere around the player
+                if (!this.isCloseScareActive) {
+                    this.watcherActive = true;
+                    this.repositionWatcher(false);
+                }
+            }
+
+            /**
+             * Teleports/lunges the Watcher directly in front of the player (3.8 - 5.2 units away)
+             * with a piercing horror scream and heavy static for ~2.25s, then vanishes into the fog.
+             * Purely a scare—never kills or damages the player.
+             */
+            triggerCloseScare() {
+                if (!this.watcher || this.isCloseScareActive) return;
+
+                const playerPos = this.camera.position;
+                const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                camForward.y = 0;
+                if (camForward.lengthSq() < 0.001) {
+                    camForward.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+                }
+                camForward.normalize();
+
+                // Slight random lateral angle inside player's forward cone so it feels organic
+                const sideVec = new THREE.Vector3(-camForward.z, 0, camForward.x);
+                const scareDist = 3.8 + Math.random() * 1.4;
+                const lateralOffset = (Math.random() - 0.5) * 1.2;
+
+                const scareX = Math.max(-WORLD_RADIUS + 4, Math.min(WORLD_RADIUS - 4,
+                    playerPos.x + camForward.x * scareDist + sideVec.x * lateralOffset
+                ));
+                const scareZ = Math.max(-WORLD_RADIUS + 4, Math.min(WORLD_RADIUS - 4,
+                    playerPos.z + camForward.z * scareDist + sideVec.z * lateralOffset
+                ));
+
+                this.watcherActive = true;
+                this.isCloseScareActive = true;
+                this.closeScareTimer = 2.25;
+                this.closeScareCooldown = Math.max(16, 28 - this.collectedCount * 1.2) + Math.random() * 16;
+
+                this.watcher.position.set(scareX, 0, scareZ);
+                this.watcher.visible = true;
+                this.watcherVisible = true;
+                this.watcherSpottedThisCycle = true;
+
+                // Face directly at player
+                this.watcher.rotation.y = Math.atan2(playerPos.x - scareX, playerPos.z - scareZ);
+
+                // Piercing suffocating blood-choking scream + intense static surge
+                this.audio.playHorrorScream(true);
+                this.elStalkerStatic.style.opacity = '0.82';
+            }
+
+            /**
+             * Triggers the full-screen jumpscare image when the player touches the Watcher.
+             */
+            triggerTouchJumpscare() {
+                if (this.isTouchJumpscareActive || this.isWon) return;
+
+                this.isTouchJumpscareActive = true;
+                this.isCloseScareActive = false;
+                this.closeScareTimer = 0;
+                this.watcher.visible = false;
+                this.watcherVisible = false;
+                this.watcherRepositionCooldown = 4.0 + Math.random() * 3.0;
+
+                if (!this.jumpscareImageReady) {
+                    renderJumpscareImage(this.elJumpscareCanvas);
+                }
+                if (this.elTouchJumpscare) {
+                    this.elTouchJumpscare.classList.add('active');
+                }
+                this.elStalkerStatic.style.opacity = '0.95';
+                this.audio.playHorrorScream(true);
+
+                if (this.touchJumpscareTimeout) {
+                    clearTimeout(this.touchJumpscareTimeout);
+                }
+                this.touchJumpscareTimeout = setTimeout(() => {
+                    this.isTouchJumpscareActive = false;
+                    if (this.elTouchJumpscare) {
+                        this.elTouchJumpscare.classList.remove('active');
+                    }
+                    if (!this.isWon) {
+                        this.elStalkerStatic.style.opacity = '0';
+                    }
+                }, 1150);
+            }
+
+            /**
+             * Places the Watcher at a distance in the fog or peeking out from behind a tree trunk,
+             * outside the player's immediate central field of view.
+             */
+            repositionWatcher(preferBehindPlayer = false) {
+                if (!this.watcher) return;
+
+                const playerPos = this.camera.position;
+                const playerForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                playerForward.y = 0;
+                playerForward.normalize();
+
+                // Distance closes in slightly as more pages are collected, while staying in the eerie distance
+                const minDist = Math.max(16, 26 - this.collectedCount * 1.2);
+                const maxDist = Math.max(24, 38 - this.collectedCount * 1.5);
+
+                let chosenPos = null;
+
+                // Try finding a tree at the right distance behind/flanking the player so it can peek from behind the trunk
+                const shuffledTrees = this.treeList.slice().sort(() => Math.random() - 0.5);
+                for (let i = 0; i < Math.min(shuffledTrees.length, 60); i++) {
+                    const t = shuffledTrees[i];
+                    const dx = t.x - playerPos.x;
+                    const dz = t.z - playerPos.z;
+                    const dist = Math.hypot(dx, dz);
+
+                    if (dist < minDist || dist > maxDist) continue;
+                    if (Math.hypot(t.x, t.z) > WORLD_RADIUS - 4) continue;
+
+                    const dirToTree = new THREE.Vector3(dx / dist, 0, dz / dist);
+                    const dot = playerForward.dot(dirToTree);
+
+                    // Spawn outside direct center view (dot < 0.35), or behind player if requested
+                    if (preferBehindPlayer ? dot < -0.1 : dot < 0.35) {
+                        // Offset slightly to the side of the tree trunk relative to player's sightline so it peeks around it
+                        const sideVec = new THREE.Vector3(-dirToTree.z, 0, dirToTree.x);
+                        const peekSign = Math.random() > 0.5 ? 1 : -1;
+                        const peekOffset = t.trunkRadius * 0.85 + 0.24;
+
+                        chosenPos = new THREE.Vector3(
+                            t.x + dirToTree.x * 0.35 + sideVec.x * peekSign * peekOffset,
+                            0,
+                            t.z + dirToTree.z * 0.35 + sideVec.z * peekSign * peekOffset
+                        );
+                        break;
+                    }
+                }
+
+                // Fallback open-fog position behind/flanking player if no ideal tree was found
+                if (!chosenPos) {
+                    const baseAngle = Math.atan2(-playerForward.z, -playerForward.x);
+                    const angle = baseAngle + (Math.random() - 0.5) * 2.2;
+                    const dist = minDist + Math.random() * (maxDist - minDist);
+                    chosenPos = new THREE.Vector3(
+                        Math.max(-WORLD_RADIUS + 5, Math.min(WORLD_RADIUS - 5, playerPos.x + Math.cos(angle) * dist)),
+                        0,
+                        Math.max(-WORLD_RADIUS + 5, Math.min(WORLD_RADIUS - 5, playerPos.z + Math.sin(angle) * dist))
+                    );
+                }
+
+                this.watcher.position.copy(chosenPos);
+                this.watcher.visible = true;
+                this.watcherVisible = true;
+                this.watcherSpottedThisCycle = false;
+                this.watcherStareTimer = 0;
+
+                // Subtle alternating head tilt each time it reappears
+                if (this.watcherHead) {
+                    this.watcherHead.rotation.z = (Math.random() > 0.5 ? 1 : -1) * (0.07 + Math.random() * 0.09);
+                }
+            }
+
+            /**
+             * Updates the Watcher's stalking AI:
+             * - Randomly spawns around the forest and lets out horrifying distant screams.
+             * - Randomly appears up close in the player's view with a piercing scream (non-lethal).
+             * - Speaks "My lungs are filled with blood." with PS1 subtitles.
+             * - Stares dead-eyed from the fog and relocates when looked away from.
+             */
+            updateWatcher(dt) {
+                if (!this.watcher) return;
+
+                // Activate automatically after 8 seconds even if the player hasn't found page 1 yet
+                if (!this.watcherActive) {
+                    this.exploreTimer += dt;
+                    if (this.exploreTimer >= 8.0) {
+                        this.watcherActive = true;
+                        this.repositionWatcher(false);
+                    }
+                }
+
+                // Occasional eerie crying sound in the background
+                this.cryCooldown -= dt;
+                if (this.cryCooldown <= 0) {
+                    this.cryCooldown = 18 + Math.random() * 22;
+                    this.audio.playBackgroundCry();
+                }
+
+                // Check direct touch / contact with the Watcher
+                if (this.watcherVisible && !this.isTouchJumpscareActive) {
+                    const touchDist = Math.hypot(
+                        this.camera.position.x - this.watcher.position.x,
+                        this.camera.position.z - this.watcher.position.z
+                    );
+                    if (touchDist <= 1.25) {
+                        this.triggerTouchJumpscare();
+                        return;
+                    }
+                }
+
+                // Handle active close-range scare animation & vanish
+                if (this.isCloseScareActive) {
+                    this.closeScareTimer -= dt;
+                    const playerPos = this.camera.position;
+                    const watcherPos = this.watcher.position;
+
+                    // Keep locked onto player's face with violent choking spasms & convulsions
+                    const tNow = performance.now();
+                    const spasmBurst = Math.sin(tNow * 0.014) > 0.15 ? 1.0 : 0.25;
+                    this.watcher.rotation.y = Math.atan2(playerPos.x - watcherPos.x, playerPos.z - watcherPos.z)
+                        + Math.sin(tNow * 0.065) * 0.09 * spasmBurst;
+                    this.watcher.position.y = Math.abs(Math.sin(tNow * 0.042)) * 0.08 * spasmBurst;
+
+                    if (this.watcherHead) {
+                        this.watcherHead.rotation.z = Math.sin(tNow * 0.055) * 0.30 * spasmBurst;
+                        this.watcherHead.rotation.x = (0.14 + Math.cos(tNow * 0.048) * 0.18) * spasmBurst;
+                    }
+                    if (this.watcherLeftWing && this.watcherRightWing) {
+                        const flap = Math.sin(tNow * 0.06) * 0.34 * spasmBurst;
+                        this.watcherLeftWing.rotation.z = -0.45 + flap;
+                        this.watcherRightWing.rotation.z = 0.45 - flap;
+                    }
+
+                    this.elStalkerStatic.style.opacity = (0.55 + Math.random() * 0.35).toFixed(2);
+                    this.audio.updateStalkerPresence(dt, 1.0);
+
+                    if (this.closeScareTimer <= 0) {
+                        this.isCloseScareActive = false;
+                        this.watcher.position.y = 0;
+                        this.watcher.visible = false;
+                        this.watcherVisible = false;
+                        this.watcherRepositionCooldown = 2.5 + Math.random() * 2.0;
+                        this.elStalkerStatic.style.opacity = '0';
+                        if (this.watcherHead) {
+                            this.watcherHead.rotation.x = 0;
+                            this.watcherHead.rotation.z = 0.09;
+                        }
+                    }
+                    return;
+                }
+
+                // Count down random ambient horrifying screams in the woods
+                this.ambientScreamCooldown -= dt;
+                if (this.ambientScreamCooldown <= 0) {
+                    this.triggerRandomDistantScream();
+                }
+
+                // Count down random close-range scare teleports
+                this.closeScareCooldown -= dt;
+                if (this.closeScareCooldown <= 0) {
+                    this.triggerCloseScare();
+                    return;
+                }
+
+                if (!this.watcherActive) {
+                    this.elStalkerStatic.style.opacity = '0';
+                    this.audio.updateStalkerPresence(dt, 0);
+                    return;
+                }
+
+                if (this.watcherRepositionCooldown > 0) {
+                    this.watcherRepositionCooldown -= dt;
+                    this.elStalkerStatic.style.opacity = '0';
+                    this.audio.updateStalkerPresence(dt, 0);
+                    if (this.watcherRepositionCooldown <= 0) {
+                        this.repositionWatcher(false);
+                    }
+                    return;
+                }
+
+                if (!this.watcherVisible) return;
+
+                const playerPos = this.camera.position;
+                const watcherPos = this.watcher.position;
+
+                // Always face and stare directly at the player
+                const dx = playerPos.x - watcherPos.x;
+                const dz = playerPos.z - watcherPos.z;
+                const dist = Math.hypot(dx, dz) || 0.001;
+                this.watcher.rotation.y = Math.atan2(dx, dz);
+
+                // Subtle eerie wing twitch when not frozen by direct gaze
+                const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                const toWatcher = new THREE.Vector3(
+                    watcherPos.x - playerPos.x,
+                    1.6 - playerPos.y,
+                    watcherPos.z - playerPos.z
+                ).normalize();
+
+                const lookDot = camForward.dot(toWatcher);
+                const inPlayerView = lookDot > 0.62 && dist < 44;
+
+                if (inPlayerView) {
+                    // Caught in sight: freeze completely still and stare dead-eyed at the player
+                    if (!this.watcherSpottedThisCycle) {
+                        this.watcherSpottedThisCycle = true;
+                        this.audio.playStalkerSpotStinger();
+                    }
+
+                    this.watcherStareTimer += dt;
+                    const stareFactor = Math.min(1.0, (lookDot - 0.62) / 0.34) * Math.max(0.25, 1.0 - dist / 46);
+                    this.elStalkerStatic.style.opacity = (stareFactor * 0.55).toFixed(3);
+                    this.audio.updateStalkerPresence(dt, stareFactor);
+
+                    // If player walks close (< 9.5m) while staring, trigger a close scare burst or slip back
+                    if (dist < 9.5) {
+                        if (Math.random() < 0.45 && this.closeScareCooldown < 12) {
+                            this.triggerCloseScare();
+                        } else {
+                            this.watcher.visible = false;
+                            this.watcherVisible = false;
+                            this.watcherRepositionCooldown = 2.0 + Math.random() * 2.0;
+                        }
+                    }
+                } else {
+                    // Out of direct view: fade static
+                    this.elStalkerStatic.style.opacity = '0';
+                    this.audio.updateStalkerPresence(dt, 0);
+
+                    // Subtle idle wing flutter in the dark
+                    const t = performance.now() * 0.0025;
+                    if (this.watcherLeftWing && this.watcherRightWing) {
+                        this.watcherLeftWing.rotation.z = -0.45 + Math.sin(t) * 0.05;
+                        this.watcherRightWing.rotation.z = 0.45 - Math.sin(t) * 0.05;
+                    }
+
+                    // If the player spotted it and then looked away, vanish and stalk from a new angle
+                    if (this.watcherSpottedThisCycle && this.watcherStareTimer > 0.35 && lookDot < 0.25) {
+                        this.watcher.visible = false;
+                        this.watcherVisible = false;
+                        this.watcherRepositionCooldown = 1.8 + Math.random() * 2.2;
+                    } else if (dist > 46) {
+                        // If player walked far away without ever noticing it, silently relocate closer
+                        this.repositionWatcher(false);
+                    }
+                }
+            }
+
+            showToast(text) {
+                this.elToast.textContent = text;
+                this.elToast.classList.add('show');
+                if (this.toastTimeout) clearTimeout(this.toastTimeout);
+                this.toastTimeout = setTimeout(() => {
+                    this.elToast.classList.remove('show');
+                }, 2600);
+            }
+
+            triggerWin() {
+                this.isWon = true;
+                this.isPlaying = false;
+                this.isCloseScareActive = false;
+                this.isTouchJumpscareActive = false;
+                if (this.touchJumpscareTimeout) clearTimeout(this.touchJumpscareTimeout);
+                if (this.elTouchJumpscare) this.elTouchJumpscare.classList.remove('active');
+                if (this.watcher) this.watcher.visible = false;
+                this.elStalkerStatic.style.opacity = '0';
+                this.audio.updateStalkerPresence(0.016, 0);
+                if (document.pointerLockElement) {
+                    document.exitPointerLock();
+                }
+                setTimeout(() => {
+                    this.elWinOverlay.classList.remove('hidden');
+                }, 650);
+            }
+
+            resetGame() {
+                this.isWon = false;
+                this.collectedCount = 0;
+                this.stamina = 1.0;
+                this.isExhausted = false;
+                this.yaw = 0;
+                this.pitch = 0;
+                this.flashlightOn = true;
+                this.flashlight.intensity = 2.8;
+                this.scene.fog.density = 0.048;
+
+                // Reset Stalker Villain state
+                this.watcherActive = false;
+                this.watcherVisible = false;
+                this.watcherSpottedThisCycle = false;
+                this.watcherStareTimer = 0;
+                this.watcherRepositionCooldown = 0;
+                this.exploreTimer = 0;
+                this.isCloseScareActive = false;
+                this.closeScareTimer = 0;
+                this.closeScareCooldown = 14 + Math.random() * 12;
+                this.ambientScreamCooldown = 11 + Math.random() * 14;
+                this.cryCooldown = 16 + Math.random() * 18;
+                this.isTouchJumpscareActive = false;
+                if (this.touchJumpscareTimeout) clearTimeout(this.touchJumpscareTimeout);
+                if (this.elTouchJumpscare) this.elTouchJumpscare.classList.remove('active');
+                this.elStalkerStatic.style.opacity = '0';
+                this.audio.updateStalkerPresence(0.016, 0);
+
+                this.camera.position.set(0, PLAYER_HEIGHT, 0);
+                this.elPageCount.textContent = '0';
+                this.elStaminaBar.classList.remove('exhausted');
+                this.elWinOverlay.classList.add('hidden');
+                this.audio.updateTension(0);
+
+                this.buildEnvironment();
+                this.buildWatcherVillain();
+            }
+
+            // ==========================================
+            // 7. MAIN ANIMATION LOOP
+            // ==========================================
+            animate() {
+				requestAnimationFrame(() => this.animate());
+
+                const dt = Math.min(this.clock.getDelta(), 0.1);
+
+                if (this.isPlaying && !this.isWon) {
+                    this.updatePlayer(dt);
+                    this.checkPageInteraction();
+                    this.updateWatcher(dt);
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // Start on window load as required
+        window.onload = function () {
+            const game = new HorrorForestGame();
+            game.animate();
+        };
+    </script>
+</body>
+</html>
